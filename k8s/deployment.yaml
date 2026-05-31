@@ -20,10 +20,12 @@ spec:
       serviceAccountName: claude-task-sa
       containers:
         - name: server
-          image: claude-task-server:latest
+          image: ghcr.io/zhengjr9/claude-task/server:latest
           ports:
             - containerPort: 8080
               name: http
+            - containerPort: 9090
+              name: remote
           env:
             - name: PORT
               value: "8080"
@@ -33,9 +35,9 @@ spec:
                   name: claude-api-secret
                   key: api-key
             - name: ANTHROPIC_BASE_URL
-              value: "https://api.anthropic.com"
+              value: "https://api.minimaxi.com/anthropic"
             - name: CONTAINER_IMAGE
-              value: "claude-task-worker:latest"
+              value: "ghcr.io/zhengjr9/claude-task/worker:latest"
             - name: K8S_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -73,6 +75,10 @@ spec:
       targetPort: 8080
       protocol: TCP
       name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: remote
   selector:
     app: claude-task
     component: server
