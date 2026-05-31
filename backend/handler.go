@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -70,34 +71,43 @@ func (h *Handler) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if we should use CLI-based meta agent
+	useCLI := os.Getenv("USE_META_CLI") == "true"
+	remoteURL := os.Getenv("CLAUDE_REMOTE_URL")
+
+	var reply string
+	var err error
+
+	if useCLI {
+		// Use Claude Code CLI with remote hooks
+		reply, err = RunMetaAgent(h.cfg, task.Conversation, remoteURL)
+	} else {
+		// Use direct HTTP API
+		reply, err = CallClaudeAPI(h.cfg, task.Conversation)
+	}
+
+	if err != nil {
+		log.Printf("Meta agent error: %v", err)
+		http.Error(w, "failed to call meta agent: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Add user message
 	task.Conversation = append(task.Conversation, Message{
 		Role:    "user",
 		Content: req.Message,
 	})
 
-	// Check conversation limit
-	if len(task.Conversation)/2 >= h.cfg.MaxConversations {
-		// Force final prompt generation
-		task.Conversation = append(task.Conversation, Message{
-			Role:    "user",
-			Content: "请根据以上对话，现在输出完整的最终开发任务 prompt。",
-		})
-	}
-
-	// Call Claude API
-	reply, err := CallClaudeAPI(h.cfg, task.Conversation)
-	if err != nil {
-		log.Printf("Claude API error: %v", err)
-		http.Error(w, "failed to call Claude API: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// Add assistant reply
+	task.Conversation = append(task.Conversation, Message{
+		Role:    "assistant",
+		Content: reply,
+	})
 
 	// Check if this is the final prompt
 	isFinal := false
 	if strings.Contains(reply, "<final-prompt>") {
 		isFinal = true
-		// Extract final prompt
 		start := strings.Index(reply, "<final-prompt>")
 		end := strings.Index(reply, "</final-prompt>")
 		if start != -1 && end != -1 {
@@ -105,12 +115,6 @@ func (h *Handler) handleChat(w http.ResponseWriter, r *http.Request) {
 			task.Status = "ready"
 		}
 	}
-
-	// Add assistant reply
-	task.Conversation = append(task.Conversation, Message{
-		Role:    "assistant",
-		Content: reply,
-	})
 
 	h.store.Update(task)
 

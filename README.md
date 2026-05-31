@@ -1,17 +1,17 @@
-# Claude Task - Unified AI Development Platform
+# CallMyAgent - Unified AI Development Platform
 
 ## Overview
 
-A Kubernetes-based AI development platform that supports both **Codex** and **Claude** engines for automated code development through multi-round conversation planning.
+CallMyAgent is a Kubernetes-based AI development platform that supports **5 AI engines** for automated code development through natural conversation planning. It provides a web UI for task management, meta conversation with AI to refine requirements, and automated execution via Kubernetes Jobs.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Web UI (Unified)                          │
+│                        Web UI (Vue 3 SPA)                        │
 │   ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
 │   │  Tasks      │  │  Sessions   │  │  Transcript Viewer      │ │
-│   │  (Meta Chat) │  │  (History)  │  │  (Full Message Tree)    │ │
+│   │  Planning   │  │  History    │  │  (Full Message Tree)    │ │
 │   └─────────────┘  └─────────────┘  └─────────────────────────┘ │
 └────────────────────────────┬────────────────────────────────────┘
                             │ HTTP API
@@ -23,32 +23,34 @@ A Kubernetes-based AI development platform that supports both **Codex** and **Cl
    │  :8080     │                       │  :9090      │
    │            │                       │            │
    │ Meta Chat  │                       │ Hook Events│
-   │ K8s Job    │                       │ Sessions   │
-   │ Management │                       │ Transcripts│
+   │ (CLI+Hooks)│                       │ Sessions   │
+   │ K8s Job    │                       │ Transcripts│
+   │ Management │                       │            │
    └─────┬──────┘                       └────────────┘
          │
          │ K8s Job
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Worker Pod                                     │
+│                    Worker Pod (callmyagent-worker)               │
 │   ┌────────────────────────────────────────────────────────────┐ │
-│   │ Container: CallMyAgent-worker                              │ │
+│   │ Container: linux/amd64                                      │ │
 │   │  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐│ │
-│   │  │   Claude   │  │   Codex    │  │   Hooks              ││ │
-│   │  │   Engine   │  │   Engine   │  │   (Event Pusher)     ││ │
+│   │  │   Claude   │  │   Codex    │  │   OpenCode/Hermes/    ││ │
+│   │  │   CLI      │  │   CLI      │  │   OpenClaw CLI       ││ │
 │   │  └────────────┘  └────────────┘  └──────────────────────┘│ │
 │   │  Remote Hooks: SessionStart → Resume detection             │ │
 │   │               Stop → Full transcript push                   │ │
+│   │  Skills: superpower capabilities                            │ │
 │   └────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Features
 
-- [x] Meta conversation with Claude/Codex to plan development tasks
+- [x] **Meta Agent** - Built-in Claude Code CLI with remote hooks for rich task planning with actual tool access
 - [x] Multi-round chat with final prompt extraction
+- [x] **5 Engine Support** - Claude, Codex, OpenCode, Hermes, OpenClaw
 - [x] Kubernetes Job execution for automated development
-- [x] Dual engine support (Claude CLI + Codex CLI)
 - [x] Remote hooks for session event capture
 - [x] Full transcript storage with universal format
 - [x] Session resumption across engine restarts
@@ -56,15 +58,39 @@ A Kubernetes-based AI development platform that supports both **Codex** and **Cl
 
 ## Engine Comparison
 
-| Feature | Claude | Codex |
-|---------|--------|-------|
-| CLI | `claude -p` | `codex exec` |
-| Model Config | `ANTHROPIC_API_KEY` | `CODEX_API_KEY` |
-| Hook Config | `settings.json` | `requirements.toml` |
-| Transcript | `~/.claude/projects/*/*.jsonl` | `~/.codex/history.jsonl` |
-| Session ID | UUID | Thread ID (UUID) |
-| Non-interactive | `-p "prompt"` | `exec "prompt"` |
-| JSON output | `--output-format json` | `--json` |
+| Engine | CLI | Install | Non-interactive |
+|--------|-----|---------|----------------|
+| Claude | `claude -p "prompt"` | npm install -g @anthropic-ai/claude-code | `--output-format json` |
+| Codex | `codex exec --json --ephemeral` | npm install -g @opencode/codex | `--json` |
+| OpenCode | `opencode -p "prompt" -f json` | curl script | `-f json` |
+| Hermes | `hermes -z "prompt" --max-turns N` | curl script | structured output |
+| OpenClaw | `openclaw exec "prompt"` | npm install -g openclaw | json output |
+
+## Meta Agent Design
+
+The meta agent uses **Claude Code CLI directly** with remote hooks instead of HTTP API calls. This gives it:
+
+1. **Real tool access** - Can read files, glob patterns, run bash commands during planning
+2. **Streaming events** - Every tool use, message, and session event is pushed via hooks
+3. **Rich context** - Full transcript available for analysis
+4. **Consistent UX** - Same interface as execution engines
+
+### Meta Agent Flow
+
+```
+User Input → Frontend → Task Server → Claude Code CLI (local)
+                                              ↓
+                                    Remote Hook Events
+                                              ↓
+                                    Remote Server (store)
+                                              ↓
+                                    Frontend Sessions View
+```
+
+The meta agent runs Claude Code in non-interactive mode with:
+- `--output-format json` for structured output
+- Hooks configured to push events to remote server
+- Custom system prompt for task refinement
 
 ## API Endpoints
 
@@ -127,15 +153,17 @@ open http://localhost:8080
 │   └── types.go
 ├── container/            # Worker container
 │   ├── Dockerfile
-│   ├── scripts/entrypoint.sh
+│   ├── scripts/
+│   │   ├── entrypoint.sh
+│   │   └── remote-hook.sh
 │   ├── skills/           # Superpower skills
 │   └── settings/
 │       ├── settings.json    # Claude settings
 │       └── codex.toml       # Codex config
 ├── frontend/
-│   └── index.html        # Unified Vue 3 SPA
+│   └── index.html        # Vue 3 SPA
 ├── hooks/
-│   ├── scripts/remote-hook.sh
-│   └── setup.sh
+│   ├── remote-hook.sh
+│   └── example-settings.json
 └── Makefile
 ```
