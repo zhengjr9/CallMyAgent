@@ -22,7 +22,7 @@ type Task struct {
 	Description  string    `json:"description"`
 	GitRepo      string    `json:"gitRepo"`
 	GitBranch    string    `json:"gitBranch"`
-	Engine       string    `json:"engine"` // "claude" or "codex"
+	Engine       string    `json:"engine"` // "claude", "codex", "opencode", "hermes", "openclaw"
 	Status       string    `json:"status"` // pending, chatting, ready, running, completed, failed
 	Conversation []Message `json:"conversation"`
 	FinalPrompt  string    `json:"finalPrompt,omitempty"`

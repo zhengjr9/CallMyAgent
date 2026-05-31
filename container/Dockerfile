@@ -9,6 +9,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN npm install -g @anthropic-ai/claude-code@latest \
     && npm cache clean --force
 
+# ── OpenCode CLI ──────────────────────────────────
+RUN curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash \
+    || true  # OpenCode may not support all platforms
+
+# ── Hermes CLI ────────────────────────────────────
+RUN curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash \
+    || true  # Hermes may not support all platforms
+
+# ── OpenClaw CLI ────────────────────────────────
+RUN npm install -g openclaw || true  # OpenClaw may not be available
+
 # Create directories
 RUN mkdir -p /home/claude/.claude /home/codex/.codex /scripts /workspace /output /skills
 

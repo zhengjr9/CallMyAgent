@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: claude-task-server
+  name: callmyagent-server
   labels:
-    app: claude-task
+    app: callmyagent
     component: server
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: claude-task
+      app: callmyagent
       component: server
   template:
     metadata:
       labels:
-        app: claude-task
+        app: callmyagent
         component: server
     spec:
-      serviceAccountName: claude-task-sa
+      serviceAccountName: callmyagent-sa
       containers:
         - name: server
-          image: ghcr.io/zhengjr9/claude-task/server:latest
+          image: ghcr.io/zhengjr9/callmyagent/server:latest
           ports:
             - containerPort: 8080
               name: http
@@ -32,12 +32,12 @@ spec:
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: claude-api-secret
+                  name: callmyagent-api-secret
                   key: api-key
             - name: ANTHROPIC_BASE_URL
               value: "https://api.minimaxi.com/anthropic"
             - name: CONTAINER_IMAGE
-              value: "ghcr.io/zhengjr9/claude-task/worker:latest"
+              value: "ghcr.io/zhengjr9/callmyagent/worker:latest"
             - name: K8S_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -65,9 +65,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: claude-task-server
+  name: callmyagent-server
   labels:
-    app: claude-task
+    app: callmyagent
 spec:
   type: ClusterIP
   ports:
@@ -80,5 +80,5 @@ spec:
       protocol: TCP
       name: remote
   selector:
-    app: claude-task
+    app: callmyagent
     component: server

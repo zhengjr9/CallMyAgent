@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "=========================================="
-echo "  Claude Task Worker"
+echo "  CallMyAgent Worker"
 echo "=========================================="
 echo "Task ID:   ${CLAUDE_TASK_ID:-unknown}"
 echo "Git Repo:  ${GIT_REPO:-not set}"
@@ -23,7 +23,7 @@ PROMPT=$(cat "$PROMPT_FILE")
 echo "Prompt loaded (${#PROMPT} chars)"
 
 # Configure git
-git config --global user.email "claude-task@automated"
+git config --global user.email "CallMyAgent@automated"
 git config --global user.name "Claude Task Bot"
 git config --global init.defaultBranch main
 
@@ -109,20 +109,16 @@ fi
 # ── Execute based on engine ──────────────────────────
 EXIT_CODE=0
 
-if [ "$ENGINE" = "codex" ]; then
+case "$ENGINE" in
+  codex)
     echo ""
     echo "=== Running Codex Engine ==="
     echo "PROMPT: ${PROMPT:0:200}..."
 
-    # Codex exec command
     CODEX_CMD="codex exec --json --ephemeral -C /workspace/repo"
-
-    # Add workspace directory
     if [ -d "/workspace/repo" ]; then
         CODEX_CMD="$CODEX_CMD --add-dir /workspace/repo"
     fi
-
-    # Run with prompt from file
     CODEX_CMD="$CODEX_CMD -- $PROMPT"
 
     echo "Executing: $CODEX_CMD"
@@ -132,23 +128,67 @@ if [ "$ENGINE" = "codex" ]; then
     set -e
 
     echo "Codex finished with exit code: $EXIT_CODE"
-
-    # Parse result
     if [ -f /workspace/codex-result.jsonl ]; then
         echo "Result saved to /workspace/codex-result.jsonl ($(wc -l < /workspace/codex-result.jsonl) lines)"
     fi
+    ;;
 
-else
+  opencode)
+    echo ""
+    echo "=== Running OpenCode Engine ==="
+    echo "PROMPT: ${PROMPT:0:200}..."
+
+    set +e
+    opencode -p "$PROMPT" -f json > /workspace/opencode-result.json 2>/workspace/opencode-error.log
+    EXIT_CODE=$?
+    set -e
+
+    echo "OpenCode finished with exit code: $EXIT_CODE"
+    if [ -f /workspace/opencode-result.json ]; then
+        echo "Result saved to /workspace/opencode-result.json"
+    fi
+    ;;
+
+  hermes)
+    echo ""
+    echo "=== Running Hermes Engine ==="
+    echo "PROMPT: ${PROMPT:0:200}..."
+
+    set +e
+    hermes -z "$PROMPT" --max-turns ${MAX_TURNS:-20} > /workspace/hermes-result.json 2>/workspace/hermes-error.log
+    EXIT_CODE=$?
+    set -e
+
+    echo "Hermes finished with exit code: $EXIT_CODE"
+    if [ -f /workspace/hermes-result.json ]; then
+        echo "Result saved to /workspace/hermes-result.json"
+    fi
+    ;;
+
+  openclaw)
+    echo ""
+    echo "=== Running OpenClaw Engine ==="
+    echo "PROMPT: ${PROMPT:0:200}..."
+
+    set +e
+    openclaw exec "$PROMPT" > /workspace/openclaw-result.json 2>/workspace/openclaw-error.log
+    EXIT_CODE=$?
+    set -e
+
+    echo "OpenClaw finished with exit code: $EXIT_CODE"
+    if [ -f /workspace/openclaw-result.json ]; then
+        echo "Result saved to /workspace/openclaw-result.json"
+    fi
+    ;;
+
+  claude|*)
     echo ""
     echo "=== Running Claude Engine ==="
     echo "PROMPT: ${PROMPT:0:200}..."
 
-    # Build Claude command
     CLAUDE_CMD="claude --permission-mode dontAsk --max-turns ${MAX_TURNS:-20} --max-budget-usd ${BUDGET_USD:-5.00}"
     CLAUDE_CMD="$CLAUDE_CMD --output-format json"
     CLAUDE_CMD="$CLAUDE_CMD --allowedTools 'Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,TodoWrite,Task'"
-
-    # Run with prompt
     CLAUDE_CMD="$CLAUDE_CMD -p \"$(echo "$PROMPT" | sed 's/"/\\"/g')\""
 
     echo "Starting Claude..."
@@ -162,13 +202,13 @@ else
     echo "---"
     echo "Claude finished with exit code: $EXIT_CODE"
 
-    # Parse result
     if [ -f /workspace/claude-result.json ]; then
         echo "Result saved to /workspace/claude-result.json"
         COST=$(jq -r '.total_cost_usd // "N/A"' /workspace/claude-result.json 2>/dev/null || echo "N/A")
         echo "Total cost: $COST"
     fi
-fi
+    ;;
+esac
 
 # ── Push changes if in a git repo ─────────────────
 if [ -d "/workspace/repo/.git" ] && [ -n "${GIT_REPO:-}" ]; then

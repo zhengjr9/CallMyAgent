@@ -39,7 +39,7 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 		return "", fmt.Errorf("k8s client: %w", err)
 	}
 
-	jobName := fmt.Sprintf("claude-task-%s", task.ID)
+	jobName := fmt.Sprintf("callmyagent-%s", task.ID)
 
 	// Build the prompt file content
 	promptContent := task.FinalPrompt
@@ -58,7 +58,7 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 			Name:      jobName + "-prompt",
 			Namespace: cfg.K8sNamespace,
 			Labels: map[string]string{
-				"app":       "claude-task",
+				"app":       "callmyagent",
 				"task-id":   task.ID,
 				"component": "worker",
 			},
@@ -158,7 +158,7 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 			Name:      jobName,
 			Namespace: cfg.K8sNamespace,
 			Labels: map[string]string{
-				"app":       "claude-task",
+				"app":       "callmyagent",
 				"task-id":   task.ID,
 				"component": "worker",
 			},
@@ -178,7 +178,7 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
-							Name:  "claude-worker",
+							Name:  "callmyagent-worker",
 							Image: cfg.ContainerImage,
 							Command: []string{"/bin/bash", "/scripts/entrypoint.sh"},
 							Env: append(envVars,

@@ -24,19 +24,19 @@ echo "  -> build/server"
 # Step 2: Build server Docker image
 echo "[2/4] Building server Docker image..."
 cd "$PROJECT_DIR"
-docker build -t "$REGISTRY/claude-task-server:$VERSION" \
+docker build -t "$REGISTRY/callmyagent-server:$VERSION" \
     -f docker/Dockerfile.server .
-docker tag "$REGISTRY/claude-task-server:$VERSION" \
-    "$REGISTRY/claude-task-server:latest"
-echo "  -> $REGISTRY/claude-task-server:$VERSION"
+docker tag "$REGISTRY/callmyagent-server:$VERSION" \
+    "$REGISTRY/callmyagent-server:latest"
+echo "  -> $REGISTRY/callmyagent-server:$VERSION"
 
 # Step 3: Build worker Docker image
 echo "[3/4] Building worker Docker image..."
-docker build -t "$REGISTRY/claude-task-worker:$VERSION" \
+docker build -t "$REGISTRY/callmyagent-worker:$VERSION" \
     -f container/Dockerfile container/
-docker tag "$REGISTRY/claude-task-worker:$VERSION" \
-    "$REGISTRY/claude-task-worker:latest"
-echo "  -> $REGISTRY/claude-task-worker:$VERSION"
+docker tag "$REGISTRY/callmyagent-worker:$VERSION" \
+    "$REGISTRY/callmyagent-worker:latest"
+echo "  -> $REGISTRY/callmyagent-worker:$VERSION"
 
 # Step 4: Summary
 echo ""
@@ -44,13 +44,13 @@ echo "=========================================="
 echo "  Build Complete"
 echo "=========================================="
 echo "Images:"
-echo "  Server: $REGISTRY/claude-task-server:$VERSION"
-echo "  Worker: $REGISTRY/claude-task-worker:$VERSION"
+echo "  Server: $REGISTRY/callmyagent-server:$VERSION"
+echo "  Worker: $REGISTRY/callmyagent-worker:$VERSION"
 echo ""
 echo "Next steps:"
 echo "  1. Push images:"
-echo "     docker push $REGISTRY/claude-task-server:$VERSION"
-echo "     docker push $REGISTRY/claude-task-worker:$VERSION"
+echo "     docker push $REGISTRY/callmyagent-server:$VERSION"
+echo "     docker push $REGISTRY/callmyagent-worker:$VERSION"
 echo ""
 echo "  2. Update k8s/secret.yaml with your API key"
 echo ""

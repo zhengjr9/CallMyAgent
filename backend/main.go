@@ -17,7 +17,7 @@ func main() {
 		Port:              getEnv("PORT", "8080"),
 		AnthropicAPIKey:   os.Getenv("ANTHROPIC_API_KEY"),
 		AnthropicBaseURL:  getEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
-		ContainerImage:    getEnv("CONTAINER_IMAGE", "claude-task-worker:latest"),
+		ContainerImage:    getEnv("CONTAINER_IMAGE", "callmyagent-worker:latest"),
 		K8sNamespace:      getEnv("K8S_NAMESPACE", "default"),
 		GitRepoURL:        os.Getenv("GIT_REPO_URL"),
 		GitBranch:         getEnv("GIT_BRANCH", "main"),
@@ -48,7 +48,7 @@ func main() {
 	fs := http.FileServer(http.Dir("./frontend"))
 	mux.Handle("/", fs)
 
-	log.Printf("claude-task server starting on :%s", cfg.Port)
+	log.Printf("CallMyAgent server starting on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
 		log.Fatal(err)
 	}

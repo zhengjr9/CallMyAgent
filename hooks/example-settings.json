@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/callmyagent/hooks/scripts/remote-hook.sh"
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/callmyagent/hooks/scripts/remote-hook.sh"
           }
         ]
       }
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/callmyagent/hooks/scripts/remote-hook.sh"
           }
         ]
       }
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/callmyagent/hooks/scripts/remote-hook.sh"
           }
         ]
       }
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/callmyagent/hooks/scripts/remote-hook.sh"
           }
         ]
       }
@@ -57,7 +57,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/callmyagent/hooks/scripts/remote-hook.sh"
           }
         ]
       }

@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: claude-task-sa
+  name: callmyagent-sa
   labels:
     app: claude-task
 ---
@@ -30,7 +30,7 @@ metadata:
     app: claude-task
 subjects:
   - kind: ServiceAccount
-    name: claude-task-sa
+    name: callmyagent-sa
     namespace: default
 roleRef:
   kind: Role

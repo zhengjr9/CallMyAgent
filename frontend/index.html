@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Task - Unified AI Dev Platform</title>
+  <title>CallMyAgent - Unified AI Dev Platform</title>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0d1117;
+      --background: #0d1117;
+      --foreground: #e6edf3;
       --surface: #161b22;
       --surface2: #21262d;
       --surface3: #30363d;
@@ -17,30 +18,46 @@
       --border-light: #21262d;
       --text: #e6edf3;
       --muted: #8b949e;
-      --blue: #58a6ff;
-      --blue-dim: #1f6feb;
-      --green: #3fb950;
-      --green-dim: #238636;
-      --red: #f85149;
-      --orange: #d29922;
-      --purple: #bc8cff;
-      --cyan: #79c0ff;
+      --primary: #58a6ff;
+      --primary-dim: #1f6feb;
+      --secondary: #8b949e;
+      --accent: #bc8cff;
+      --success: #3fb950;
+      --success-dim: #238636;
+      --destructive: #f85149;
+      --warning: #d29922;
+      --info: #79c0ff;
       --pink: #db61a2;
       --radius: 8px;
       --radius-sm: 4px;
+      --radius-lg: 12px;
+    }
+
+    /* Legacy aliases */
+    :root {
+      --bg: var(--background);
+      --blue: var(--primary);
+      --blue-dim: var(--primary-dim);
+      --green: var(--success);
+      --green-dim: var(--success-dim);
+      --red: var(--destructive);
+      --orange: var(--warning);
+      --purple: var(--accent);
+      --cyan: var(--info);
     }
 
     html, body { height: 100%; overflow: hidden; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
       font-size: 14px;
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
 
-    a { color: var(--blue); text-decoration: none; }
+    a { color: var(--primary); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
     button {
@@ -54,7 +71,7 @@
     }
 
     button.primary {
-      background: var(--blue);
+      background: var(--primary);
       color: white;
     }
     button.primary:hover { background: #79b8ff; }
@@ -695,6 +712,9 @@
           <select v-model="newTask.engine">
             <option value="claude">Claude</option>
             <option value="codex">Codex</option>
+            <option value="opencode">OpenCode</option>
+            <option value="hermes">Hermes</option>
+            <option value="openclaw">OpenClaw</option>
           </select>
         </div>
       </div>
@@ -708,7 +728,7 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="sidebar-header">
-      <h1><span class="logo-dot"></span> Claude Task</h1>
+      <h1><span class="logo-dot"></span> CallMyAgent</h1>
     </div>
 
     <div class="sidebar-nav">
@@ -790,10 +810,16 @@
         </div>
         <div class="engine-selector">
           <label>Engine:</label>
-          <button class="engine-btn" :class="{active: currentTask.engine !== 'codex'}"
+          <button class="engine-btn" :class="{active: currentTask.engine === 'claude'}"
                   @click="currentTask.engine = 'claude'">Claude</button>
           <button class="engine-btn" :class="{active: currentTask.engine === 'codex'}"
                   @click="currentTask.engine = 'codex'">Codex</button>
+          <button class="engine-btn" :class="{active: currentTask.engine === 'opencode'}"
+                  @click="currentTask.engine = 'opencode'">OpenCode</button>
+          <button class="engine-btn" :class="{active: currentTask.engine === 'hermes'}"
+                  @click="currentTask.engine = 'hermes'">Hermes</button>
+          <button class="engine-btn" :class="{active: currentTask.engine === 'openclaw'}"
+                  @click="currentTask.engine = 'openclaw'">OpenClaw</button>
         </div>
       </div>
 
@@ -873,6 +899,9 @@
               <select v-model="executeConfig.engine">
                 <option value="claude">Claude</option>
                 <option value="codex">Codex</option>
+                <option value="opencode">OpenCode</option>
+                <option value="hermes">Hermes</option>
+                <option value="openclaw">OpenClaw</option>
               </select>
             </div>
             <div class="form-group">
@@ -1051,7 +1080,7 @@
     <template v-else>
       <div class="welcome">
         <div class="welcome-icon">🤖</div>
-        <h2>Claude Task</h2>
+        <h2>CallMyAgent</h2>
         <p>通过 AI 对话规划开发任务，自动执行代码编写。支持 Claude 和 Codex 双引擎。</p>
         <button class="primary" @click="showNewTask = true">新建任务</button>
       </div>

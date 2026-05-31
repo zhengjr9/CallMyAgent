@@ -32,7 +32,7 @@ A Kubernetes-based AI development platform that supports both **Codex** and **Cl
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Worker Pod                                     │
 │   ┌────────────────────────────────────────────────────────────┐ │
-│   │ Container: claude-task-worker                              │ │
+│   │ Container: CallMyAgent-worker                              │ │
 │   │  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐│ │
 │   │  │   Claude   │  │   Codex    │  │   Hooks              ││ │
 │   │  │   Engine   │  │   Engine   │  │   (Event Pusher)     ││ │
