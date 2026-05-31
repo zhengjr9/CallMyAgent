@@ -1,0 +1,62 @@
+package main
+
+import (
+	"log"
+	"net/http"
+	"os"
+)
+
+func main() {
+	// Support CLAUDE_API_TOKEN or ANTHROPIC_AUTH_TOKEN
+	claudeToken := os.Getenv("CLAUDE_API_TOKEN")
+	if claudeToken == "" {
+		claudeToken = os.Getenv("ANTHROPIC_AUTH_TOKEN")
+	}
+
+	cfg := &Config{
+		Port:              getEnv("PORT", "8080"),
+		AnthropicAPIKey:   os.Getenv("ANTHROPIC_API_KEY"),
+		AnthropicBaseURL:  getEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
+		ContainerImage:    getEnv("CONTAINER_IMAGE", "claude-task-worker:latest"),
+		K8sNamespace:      getEnv("K8S_NAMESPACE", "default"),
+		GitRepoURL:        os.Getenv("GIT_REPO_URL"),
+		GitBranch:         getEnv("GIT_BRANCH", "main"),
+		ClaudeAPIToken:    claudeToken,
+		ClaudeBaseURL:     getEnv("CLAUDE_BASE_URL", ""),
+		SkillsDir:         getEnv("SKILLS_DIR", "/skills"),
+		MaxConversations:  5,
+		OutputPVC:         os.Getenv("OUTPUT_PVC"),
+		Model:             os.Getenv("CLAUDE_MODEL"),
+	}
+
+	store := NewTaskStore()
+	handler := NewHandler(cfg, store)
+
+	mux := http.NewServeMux()
+
+	// API routes
+	mux.HandleFunc("/api/tasks", handler.handleTasks)
+	mux.HandleFunc("/api/tasks/", handler.handleTaskByID)
+	mux.HandleFunc("/api/tasks/chat", handler.handleChat)
+	mux.HandleFunc("/api/tasks/execute", handler.handleExecute)
+	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	// Serve frontend static files
+	fs := http.FileServer(http.Dir("./frontend"))
+	mux.Handle("/", fs)
+
+	log.Printf("claude-task server starting on :%s", cfg.Port)
+	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

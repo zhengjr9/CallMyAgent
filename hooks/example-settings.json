@@ -1,0 +1,70 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/zhengjiarui/go/src/github.com/workspace/claude-task/hooks/scripts/remote-hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "CLAUDE_REMOTE_URL": "http://localhost:9090",
+    "CLAUDE_REMOTE_TOKEN": ""
+  }
+}

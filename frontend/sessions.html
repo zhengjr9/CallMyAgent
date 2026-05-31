@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Remote Sessions</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #21262d;
+      --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+      --blue: #58a6ff; --green: #3fb950; --red: #f85149;
+      --purple: #bc8cff; --orange: #d29922; --cyan: #79c0ff;
+    }
+    body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+    a { color: var(--blue); text-decoration: none; }
+
+    .layout { display: flex; height: 100vh; }
+    .sidebar { width: 320px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+    .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); }
+    .sidebar-header h1 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .sidebar-header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .stats { padding: 12px 16px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; gap: 16px; flex-wrap: wrap; }
+    .stats span { display: flex; align-items: center; gap: 4px; }
+    .session-list { flex: 1; overflow-y: auto; }
+    .session-item { padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+    .session-item:hover { background: var(--surface2); }
+    .session-item.active { background: #1c2333; border-left: 3px solid var(--blue); }
+    .session-item .sid { font-family: monospace; font-size: 13px; }
+    .session-item .meta { font-size: 12px; color: var(--muted); margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge { padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+    .badge-active { background: #1a3d2e; color: var(--green); }
+    .badge-resumed { background: #1a2a4a; color: var(--cyan); }
+    .badge-ended { background: #2d2d2d; color: var(--muted); }
+
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .main-header { padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .main-header h2 { font-size: 14px; font-weight: 500; font-family: monospace; word-break: break-all; }
+    .session-info { font-size: 12px; color: var(--muted); margin-left: 12px; }
+    .session-info span { margin-right: 12px; }
+    .tabs { display: flex; gap: 0; margin-left: auto; }
+    .tab { padding: 6px 16px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); }
+    .tab.active { color: var(--text); border-bottom-color: var(--blue); }
+
+    .content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+    /* Messages - full transcript view */
+    .msg { margin-bottom: 20px; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
+    .msg-user { border-color: #2a3a4a; }
+    .msg-header { padding: 10px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+    .msg-user .msg-header { background: #1a2332; }
+    .msg-assistant .msg-header { background: var(--surface2); }
+    .msg-role { font-weight: 600; font-size: 13px; }
+    .msg-role.user { color: var(--blue); }
+    .msg-role.assistant { color: var(--purple); }
+    .msg-meta { font-size: 12px; color: var(--muted); margin-left: auto; display: flex; gap: 12px; }
+    .msg-uuid { font-family: monospace; font-size: 11px; }
+
+    /* Content blocks */
+    .content-blocks { padding: 12px 14px; }
+    .block { margin-bottom: 10px; }
+    .block:last-child { margin-bottom: 0; }
+    .block-text { font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+    .block-thinking { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 13px; color: var(--muted); font-style: italic; }
+    .block-thinking-label { font-size: 11px; color: var(--orange); font-weight: 600; margin-bottom: 4px; display: block; }
+    .block-tool_use { background: #1a2332; border: 1px solid #2a3a4a; border-radius: 6px; padding: 10px 12px; }
+    .block-tool_use-label { font-size: 11px; color: var(--orange); font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .block-tool_use-label::before { content: '→'; }
+    .tool-name { font-weight: 600; color: var(--orange); font-family: monospace; }
+    .tool-id { font-family: monospace; font-size: 11px; color: var(--muted); margin-left: 8px; }
+    .tool-input { margin-top: 8px; background: var(--bg); border-radius: 4px; padding: 8px 10px; font-family: monospace; font-size: 12px; overflow-x: auto; }
+    .tool-input-key { color: var(--cyan); }
+    .tool-input-value { color: var(--text); }
+    .tool-input-null { color: var(--muted); font-style: italic; }
+    .block-tool_result { background: #0d1f12; border: 1px solid #1a3d2e; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: var(--green); font-family: monospace; }
+
+    /* Events */
+    .event { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: flex-start; }
+    .event:hover { background: var(--surface2); }
+    .event-time { color: var(--muted); min-width: 85px; font-family: monospace; font-size: 12px; flex-shrink: 0; }
+    .event-name { color: var(--green); min-width: 140px; font-weight: 500; flex-shrink: 0; }
+    .event-detail { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .event-tool { color: var(--orange); font-family: monospace; }
+    .event-tool-input { margin-top: 4px; padding: 4px 8px; background: var(--bg); border-radius: 4px; font-size: 11px; color: var(--muted); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px; }
+
+    /* Tools */
+    .tool-item { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .tool-item:hover { background: var(--surface2); }
+    .tool-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .tool-name { font-weight: 600; font-size: 14px; color: var(--orange); font-family: monospace; }
+    .tool-event { font-size: 12px; color: var(--muted); padding: 2px 8px; background: var(--surface2); border-radius: 4px; }
+    .tool-is-pre { color: var(--blue); font-size: 11px; }
+    .tool-input-full { background: var(--bg); border-radius: 6px; padding: 10px 12px; font-family: monospace; font-size: 12px; overflow-x: auto; }
+    .tool-input-row { display: flex; gap: 8px; margin-bottom: 4px; }
+    .tool-input-row:last-child { margin-bottom: 0; }
+    .tool-key { color: var(--cyan); min-width: 100px; flex-shrink: 0; }
+    .tool-value { color: var(--text); word-break: break-all; }
+    .tool-value-string { color: var(--text); }
+    .tool-value-object { color: var(--text); }
+    .tool-empty { color: var(--muted); font-style: italic; }
+
+    /* Transcript stat bar */
+    .transcript-stat { padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); display: flex; gap: 20px; }
+    .transcript-stat span { display: flex; gap: 6px; }
+    .stat-label { color: var(--muted); }
+    .stat-value { color: var(--text); font-weight: 500; }
+
+    .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--muted); font-size: 14px; flex-direction: column; gap: 8px; }
+    .empty-icon { font-size: 32px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  </style>
+</head>
+<body>
+<div id="app" class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1><span class="dot"></span> Claude Sessions</h1>
+    </div>
+    <div class="stats" v-if="stats">
+      <span><span class="stat-value">{{ stats.active_sessions }}</span> active</span>
+      <span><span class="stat-value">{{ stats.total_sessions }}</span> total</span>
+      <span><span class="stat-value">{{ stats.total_transcripts || 0 }}</span> transcripts</span>
+      <span><span class="stat-value">{{ stats.total_tools }}</span> tools</span>
+    </div>
+    <div class="session-list">
+      <div class="session-item" v-for="s in sessions" :key="s.session_id"
+           :class="{ active: currentSession && currentSession.session_id === s.session_id }"
+           @click="selectSession(s)">
+        <div class="sid">{{ s.session_id.slice(0, 16) }}...</div>
+        <div class="meta">
+          <span class="badge" :class="'badge-' + (s.status === 'active' ? 'active' : s.status === 'resumed' ? 'resumed' : 'ended')">
+            {{ s.status }}
+          </span>
+          <span v-if="s.model">{{ s.model.slice(0, 12) }}</span>
+          <span>{{ s.cwd ? s.cwd.split('/').pop() : '' }}</span>
+        </div>
+      </div>
+      <div class="empty" v-if="sessions.length === 0">
+        <div class="empty-icon">📭</div>
+        No sessions captured yet
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <template v-if="currentSession">
+      <div class="main-header">
+        <h2>{{ currentSession.session_id }}</h2>
+        <div class="session-info">
+          <span>model: {{ currentSession.model || 'unknown' }}</span>
+          <span>cwd: {{ currentSession.cwd }}</span>
+          <span v-if="currentSession.started_at">started: {{ formatTime(currentSession.started_at) }}</span>
+        </div>
+        <div class="tabs">
+          <div class="tab" :class="{ active: tab === 'messages' }" @click="tab = 'messages'">
+            Messages <span class="stat-value">({{ transcriptMessages.length }})</span>
+          </div>
+          <div class="tab" :class="{ active: tab === 'events' }" @click="tab = 'events'">
+            Events <span class="stat-value">({{ events.length }})</span>
+          </div>
+          <div class="tab" :class="{ active: tab === 'tools' }" @click="tab = 'tools'">
+            Tools <span class="stat-value">({{ tools.length }})</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transcript stat bar -->
+      <div class="transcript-stat" v-if="tab === 'messages'">
+        <span><span class="stat-label">Messages:</span> <span class="stat-value">{{ transcriptMessageCount }}</span></span>
+        <span><span class="stat-label">User:</span> <span class="stat-value">{{ transcriptUserCount }}</span></span>
+        <span><span class="stat-label">Assistant:</span> <span class="stat-value">{{ transcriptAssistantCount }}</span></span>
+        <span><span class="stat-label">Tool calls:</span> <span class="stat-value">{{ transcriptToolCount }}</span></span>
+      </div>
+
+      <div class="content" ref="content">
+        <!-- Messages Tab - Full Transcript -->
+        <template v-if="tab === 'messages'">
+          <div class="msg" v-for="(msg, i) in transcriptMessages" :key="i"
+               :class="msg.role === 'user' ? 'msg-user' : 'msg-assistant'">
+            <div class="msg-header">
+              <span class="msg-role" :class="msg.role">{{ msg.role === 'user' ? 'User' : 'Claude' }}</span>
+              <div class="msg-meta">
+                <span class="msg-uuid" v-if="msg.uuid">{{ msg.uuid.slice(0, 8) }}</span>
+                <span>{{ formatTimeShort(msg.timestamp) }}</span>
+              </div>
+            </div>
+            <div class="content-blocks">
+              <template v-if="Array.isArray(msg.content)">
+                <div v-for="(block, bi) in msg.content" :key="bi" class="block" :class="'block-' + block.type">
+                  <!-- text -->
+                  <div v-if="block.type === 'text'" class="block-text">{{ block.text }}</div>
+
+                  <!-- thinking -->
+                  <div v-else-if="block.type === 'thinking'" class="block-thinking">
+                    <span class="block-thinking-label">💭 Thinking</span>
+                    {{ block.thinking }}
+                  </div>
+
+                  <!-- tool_use -->
+                  <div v-else-if="block.type === 'tool_use'" class="block-tool_use">
+                    <div class="block-tool_use-label">
+                      <span class="tool-name">{{ block.name }}</span>
+                      <span class="tool-id" v-if="block.id">{{ block.id.slice(0, 16) }}...</span>
+                    </div>
+                    <div class="tool-input" v-if="block.input && Object.keys(block.input).length > 0">
+                      <div v-for="(val, key) in block.input" :key="key" class="tool-input-row">
+                        <span class="tool-input-key">{{ key }}:</span>
+                        <span class="tool-input-value" v-if="val !== null && val !== undefined">{{ typeof val === 'object' ? JSON.stringify(val).slice(0, 300) : val }}</span>
+                        <span class="tool-input-null" v-else>null</span>
+                      </div>
+                    </div>
+                    <div class="tool-empty" v-else>no input</div>
+                  </div>
+
+                  <!-- tool_result -->
+                  <div v-else-if="block.type === 'tool_result'" class="block-tool_result">
+                    [Result] {{ typeof block.content === 'string' ? block.content.slice(0, 200) : JSON.stringify(block.content).slice(0, 200) }}
+                  </div>
+
+                  <!-- unknown type -->
+                  <div v-else class="block-text" style="color: var(--muted); font-size: 12px;">
+                    [{{ block.type }}]
+                  </div>
+                </div>
+              </template>
+              <template v-else-if="typeof msg.content === 'string'">
+                <div class="block-text">{{ msg.content }}</div>
+              </template>
+              <template v-else-if="msg.thinking">
+                <div class="block-thinking">
+                  <span class="block-thinking-label">💭 Thinking</span>
+                  {{ msg.thinking }}
+                </div>
+              </template>
+              <div v-else class="block-text" style="color: var(--muted);">empty content</div>
+            </div>
+          </div>
+          <div class="empty" v-if="transcriptMessages.length === 0">
+            <div class="empty-icon">💬</div>
+            No messages in transcript
+          </div>
+        </template>
+
+        <!-- Events Tab -->
+        <template v-else-if="tab === 'events'">
+          <div class="event" v-for="(e, i) in events" :key="i">
+            <span class="event-time">{{ formatTimeShort(e.timestamp) }}</span>
+            <span class="event-name">{{ e.event }}</span>
+            <span class="event-detail">
+              <template v-if="e.raw && e.raw.tool_name">
+                <span class="event-tool">{{ e.raw.tool_name }}</span>
+                <div class="event-tool-input" v-if="e.raw.tool_input && Object.keys(e.raw.tool_input).length">
+                  {{ JSON.stringify(e.raw.tool_input).slice(0, 200) }}
+                </div>
+              </template>
+              <template v-else-if="e.raw && e.raw.prompt">
+                {{ e.raw.prompt.slice(0, 100) }}
+              </template>
+              <template v-else-if="e.raw && e.raw.model">
+                {{ e.raw.model }}
+              </template>
+              <template v-else>
+                {{ e.cwd || e.transcript_path || '' }}
+              </template>
+            </span>
+          </div>
+        </template>
+
+        <!-- Tools Tab -->
+        <template v-else-if="tab === 'tools'">
+          <div class="tool-item" v-for="(t, i) in tools" :key="i">
+            <div class="tool-header">
+              <span class="tool-name">{{ t.tool_name }}</span>
+              <span class="tool-event">{{ t.event }}</span>
+              <span class="tool-is-pre" v-if="t.is_pre_tool">pre</span>
+              <span class="tool-is-pre" v-else>post</span>
+            </div>
+            <div class="tool-input-full" v-if="t.tool_input && Object.keys(t.tool_input).length">
+              <div v-for="(val, key) in t.tool_input" :key="key" class="tool-input-row">
+                <span class="tool-key">{{ key }}:</span>
+                <span class="tool-value">
+                  <template v-if="val !== null && val !== undefined">
+                    <span v-if="typeof val === 'string'" class="tool-value-string">{{ val }}</span>
+                    <span v-else class="tool-value-object">{{ JSON.stringify(val) }}</span>
+                  </template>
+                  <span v-else class="tool-empty">null</span>
+                </span>
+              </div>
+            </div>
+            <div class="tool-empty" v-else>no input recorded</div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="empty">
+        <div class="empty-icon">👈</div>
+        Select a session from the sidebar to view details
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+
+createApp({
+  setup() {
+    const API = window.location.origin;
+    const sessions = ref([]);
+    const currentSession = ref(null);
+    const transcript = ref(null);
+    const messages = ref([]);
+    const events = ref([]);
+    const tools = ref([]);
+    const stats = ref(null);
+    const tab = ref('messages');
+    const content = ref(null);
+
+    // Computed from transcript
+    const transcriptMessages = computed(() => transcript.value?.messages || []);
+    const transcriptMessageCount = computed(() => transcript.value?.message_count || 0);
+    const transcriptUserCount = computed(() => transcriptMessages.value.filter(m => m.role === 'user').length);
+    const transcriptAssistantCount = computed(() => transcriptMessages.value.filter(m => m.role === 'assistant').length);
+    const transcriptToolCount = computed(() => {
+      let count = 0;
+      for (const msg of transcriptMessages.value) {
+        if (Array.isArray(msg.content)) {
+          count += msg.content.filter(b => b.type === 'tool_use').length;
+        }
+      }
+      return count;
+    });
+
+    const scrollToBottom = async () => {
+      await nextTick();
+      if (content.value) content.value.scrollTop = content.value.scrollHeight;
+    };
+
+    const formatTime = (t) => {
+      if (!t) return '';
+      try { return new Date(t).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+      catch { return t; }
+    };
+
+    const formatTimeShort = (t) => {
+      if (!t) return '';
+      try { return new Date(t).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+      catch { return t; }
+    };
+
+    const loadSessions = async () => {
+      try {
+        const res = await fetch(API + '/api/sessions');
+        sessions.value = (await res.json()) || [];
+        sessions.value.sort((a, b) => (b.started_at || '').localeCompare(a.started_at || ''));
+      } catch (e) { console.error('load sessions:', e); }
+    };
+
+    const loadStats = async () => {
+      try {
+        const res = await fetch(API + '/api/sessions?fields');
+        stats.value = (await res.json()) || {};
+      } catch (e) {}
+    };
+
+    const selectSession = async (s) => {
+      currentSession.value = s;
+      tab.value = 'messages';
+      transcript.value = null;
+      messages.value = [];
+      events.value = [];
+      tools.value = [];
+      await loadSessionData(s.session_id);
+    };
+
+    const loadSessionData = async (sid) => {
+      try {
+        // Load transcript for full message view
+        const [transcriptRes, evtRes, toolRes] = await Promise.all([
+          fetch(API + '/api/sessions/' + sid + '/transcript'),
+          fetch(API + '/api/sessions/' + sid + '/events'),
+          fetch(API + '/api/sessions/' + sid + '/tools'),
+        ]);
+
+        // Load transcript - if no transcript, fall back to messages
+        const t = await transcriptRes.json();
+        if (t && !t.error && t.messages) {
+          transcript.value = t;
+        } else {
+          transcript.value = null;
+          // Fall back to messages endpoint
+          const msgRes = await fetch(API + '/api/sessions/' + sid + '/messages');
+          messages.value = (await msgRes.json()) || [];
+        }
+
+        events.value = (await evtRes.json()) || [];
+        tools.value = (await toolRes.json()) || [];
+
+        // For events and tools, also load from messages endpoint as backup
+        if (transcript.value) {
+          const msgRes = await fetch(API + '/api/sessions/' + sid + '/messages');
+          const msgs = (await msgRes.json()) || [];
+          // Merge if needed - but prefer transcript
+        }
+
+        scrollToBottom();
+      } catch (e) { console.error('load session data:', e); }
+    };
+
+    // Auto-refresh
+    const refresh = async () => {
+      await loadSessions();
+      await loadStats();
+      if (currentSession.value) {
+        const sid = currentSession.value.session_id;
+        const [transcriptRes, evtRes, toolRes] = await Promise.all([
+          fetch(API + '/api/sessions/' + sid + '/transcript'),
+          fetch(API + '/api/sessions/' + sid + '/events'),
+          fetch(API + '/api/sessions/' + sid + '/tools'),
+        ]);
+        const t = await transcriptRes.json();
+        if (t && !t.error && t.messages) {
+          transcript.value = t;
+        }
+        events.value = (await evtRes.json()) || [];
+        tools.value = (await toolRes.json()) || [];
+      }
+    };
+
+    onMounted(() => {
+      loadSessions();
+      loadStats();
+      setInterval(refresh, 5000);
+    });
+
+    watch(tab, () => {
+      scrollToBottom();
+    });
+
+    return {
+      sessions, currentSession, transcript, transcriptMessages, transcriptMessageCount,
+      transcriptUserCount, transcriptAssistantCount, transcriptToolCount,
+      messages, events, tools, stats, tab, content,
+      formatTime, formatTimeShort, selectSession
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

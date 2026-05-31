@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Task - Unified AI Dev Platform</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --surface3: #30363d;
+      --border: #30363d;
+      --border-light: #21262d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --blue: #58a6ff;
+      --blue-dim: #1f6feb;
+      --green: #3fb950;
+      --green-dim: #238636;
+      --red: #f85149;
+      --orange: #d29922;
+      --purple: #bc8cff;
+      --cyan: #79c0ff;
+      --pink: #db61a2;
+      --radius: 8px;
+      --radius-sm: 4px;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 6px 14px;
+      transition: all 0.15s;
+    }
+
+    button.primary {
+      background: var(--blue);
+      color: white;
+    }
+    button.primary:hover { background: #79b8ff; }
+
+    button.secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button.secondary:hover { background: var(--surface3); }
+
+    button.danger { background: var(--red); color: white; }
+    button.danger:hover { opacity: 0.85; }
+
+    button.success { background: var(--green-dim); color: white; }
+    button.success:hover { opacity: 0.85; }
+
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    input, textarea, select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--blue);
+    }
+
+    select { cursor: pointer; }
+
+    .mono { font-family: 'SF Mono', 'Fira Code', monospace; }
+
+    /* Layout */
+    #app { display: flex; height: 100vh; overflow: hidden; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .sidebar-nav {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-item {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .nav-item:hover { color: var(--text); }
+    .nav-item.active {
+      color: var(--text);
+      border-bottom-color: var(--blue);
+    }
+
+    .sidebar-stats {
+      padding: 10px 16px;
+      font-size: 12px;
+      color: var(--muted);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .stat-item { display: flex; flex-direction: column; gap: 2px; }
+    .stat-label { color: var(--muted); font-size: 11px; }
+    .stat-value { font-weight: 600; font-size: 14px; color: var(--text); }
+
+    .sidebar-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .list-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-light);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .list-item:hover { background: var(--surface2); }
+    .list-item.active {
+      background: #1c2333;
+      border-left: 3px solid var(--blue);
+    }
+
+    .list-item-title {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .list-item-meta {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .badge {
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    .badge-active { background: #1a3d2e; color: var(--green); }
+    .badge-resumed { background: #1a2a4a; color: var(--cyan); }
+    .badge-ended { background: #2d2d2d; color: var(--muted); }
+    .badge-error { background: #3d1a1a; color: var(--red); }
+    .badge-ready { background: #1a3d2e; color: var(--green); }
+    .badge-running { background: #3d2e1a; color: var(--orange); }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .main-header {
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .main-title {
+      font-size: 14px;
+      font-weight: 500;
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .main-meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 16px;
+      flex: 1;
+    }
+
+    .main-content {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Panels */
+    .panel-tabs {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+      gap: 0;
+      flex-shrink: 0;
+    }
+
+    .panel-tab {
+      padding: 10px 16px;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-tab:hover { color: var(--text); }
+    .panel-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--blue);
+    }
+
+    .tab-count {
+      background: var(--surface2);
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+
+    /* Welcome */
+    .welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 16px;
+      color: var(--muted);
+      text-align: center;
+      padding: 40px;
+    }
+
+    .welcome-icon { font-size: 48px; margin-bottom: 8px; }
+    .welcome h2 { font-size: 20px; color: var(--text); }
+    .welcome p { font-size: 14px; max-width: 400px; }
+
+    /* Chat */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .message.user {
+      background: #1a2332;
+      border-color: #2a3a4a;
+    }
+
+    .message.assistant {
+      background: var(--surface);
+    }
+
+    .message-header {
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 12px;
+    }
+
+    .message.user .message-header { background: #1a2a3a; }
+    .message.assistant .message-header { background: var(--surface2); }
+
+    .message-role {
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .message.user .message-role { color: var(--blue); }
+    .message.assistant .message-role { color: var(--purple); }
+
+    .message-time { color: var(--muted); margin-left: auto; }
+    .message-uuid { color: var(--muted); font-family: monospace; font-size: 11px; }
+
+    .message-body { padding: 12px 14px; }
+
+    /* Content blocks */
+    .block { margin-bottom: 10px; }
+    .block:last-child { margin-bottom: 0; }
+
+    .block-text {
+      font-size: 14px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .block-thinking {
+      background: var(--surface2);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .block-thinking-label {
+      font-size: 11px;
+      color: var(--orange);
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .block-tool_use {
+      background: #1a2332;
+      border: 1px solid #2a3a4a;
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+
+    .block-tool-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .block-tool-label::before { content: '→'; color: var(--orange); }
+
+    .tool-name {
+      font-weight: 600;
+      color: var(--orange);
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .tool-id {
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: 8px;
+    }
+
+    .tool-input {
+      margin-top: 8px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: monospace;
+      font-size: 12px;
+      overflow-x: auto;
+    }
+
+    .tool-input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+
+    .tool-input-row:last-child { margin-bottom: 0; }
+
+    .tool-key { color: var(--cyan); min-width: 80px; flex-shrink: 0; }
+    .tool-val { color: var(--text); word-break: break-all; }
+    .tool-null { color: var(--muted); font-style: italic; }
+
+    .block-tool_result {
+      background: #0d1f12;
+      border: 1px solid #1a3d2e;
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--green);
+      font-family: monospace;
+    }
+
+    /* Input area */
+    .input-area {
+      padding: 16px 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .input-row textarea {
+      flex: 1;
+      min-height: 48px;
+      max-height: 200px;
+      resize: none;
+      padding: 10px 14px;
+      font-size: 14px;
+      border-radius: var(--radius);
+      font-family: inherit;
+    }
+
+    .input-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Task form */
+    .task-form {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 13px; color: var(--muted); }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%;
+    }
+
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 540px;
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h2 { font-size: 16px; font-weight: 600; }
+    .modal-close { background: none; color: var(--muted); font-size: 20px; padding: 4px 8px; }
+    .modal-close:hover { color: var(--text); }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    /* Execute config */
+    .execute-config {
+      background: var(--surface2);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin-bottom: 12px;
+    }
+
+    .execute-config-title {
+      font-size: 12px;
+      color: var(--blue);
+      font-weight: 500;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .execute-config-grid {
+      display: grid;
+      grid-template-columns: 1fr 120px;
+      gap: 10px;
+    }
+
+    /* Engine selector */
+    .engine-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .engine-selector label { font-size: 12px; color: var(--muted); }
+
+    .engine-btn {
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .engine-btn.active { background: var(--blue); color: white; border-color: var(--blue); }
+
+    /* Sessions list */
+    .session-info-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .session-info-item { display: flex; flex-direction: column; gap: 2px; }
+    .session-info-label { color: var(--muted); }
+    .session-info-value { font-weight: 500; }
+
+    /* Empty states */
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: var(--muted);
+      text-align: center;
+      gap: 12px;
+    }
+
+    .empty-icon { font-size: 36px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* Transcript stat bar */
+    .transcript-stat {
+      display: flex;
+      gap: 20px;
+      padding: 8px 16px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .transcript-stat span { display: flex; gap: 6px; }
+
+    /* Final prompt indicator */
+    .final-prompt-banner {
+      background: linear-gradient(135deg, #1a3d2e, #0d2118);
+      border: 1px solid var(--green-dim);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .final-prompt-banner-icon { font-size: 20px; }
+    .final-prompt-banner-text { font-size: 13px; }
+    .final-prompt-banner-text strong { color: var(--green); }
+
+    /* Tooltip */
+    [title] { cursor: help; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- New Task Modal -->
+  <div class="modal-overlay" v-if="showNewTask" @click.self="showNewTask = false">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>新建开发任务</h2>
+        <button class="modal-close" @click="showNewTask = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>任务标题</label>
+          <input v-model="newTask.title" placeholder="例如：添加用户登录功能" @keyup.enter="createTask">
+        </div>
+        <div class="form-group">
+          <label>任务描述</label>
+          <textarea v-model="newTask.description" placeholder="详细描述需要完成的工作..." rows="4"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Git 仓库</label>
+            <input v-model="newTask.gitRepo" placeholder="https://github.com/user/repo.git">
+          </div>
+          <div class="form-group">
+            <label>分支</label>
+            <input v-model="newTask.gitBranch" placeholder="main">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>执行引擎</label>
+          <select v-model="newTask.engine">
+            <option value="claude">Claude</option>
+            <option value="codex">Codex</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="secondary" @click="showNewTask = false">取消</button>
+        <button class="primary" @click="createTask" :disabled="!newTask.title">创建任务</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1><span class="logo-dot"></span> Claude Task</h1>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-item" :class="{active: view === 'tasks'}" @click="view = 'tasks'">Tasks</div>
+      <div class="nav-item" :class="{active: view === 'sessions'}" @click="view = 'sessions'">Sessions</div>
+    </div>
+
+    <div class="sidebar-stats" v-if="stats">
+      <div class="stat-item">
+        <span class="stat-label">Sessions</span>
+        <span class="stat-value">{{ stats.total_sessions || 0 }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Active</span>
+        <span class="stat-value">{{ stats.active_sessions || 0 }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Tools</span>
+        <span class="stat-value">{{ stats.total_tools || 0 }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Transcripts</span>
+        <span class="stat-value">{{ stats.total_transcripts || 0 }}</span>
+      </div>
+    </div>
+
+    <div class="sidebar-list">
+      <!-- Tasks View -->
+      <template v-if="view === 'tasks'">
+        <div class="list-item" v-for="t in tasks" :key="t.id"
+             :class="{active: currentTask && currentTask.id === t.id}"
+             @click="selectTask(t)">
+          <div class="list-item-title">{{ t.title }}</div>
+          <div class="list-item-meta">
+            <span class="badge" :class="'badge-' + t.status">{{ statusText(t.status) }}</span>
+            <span>{{ formatTime(t.createdAt) }}</span>
+          </div>
+        </div>
+        <div class="empty" v-if="tasks.length === 0">
+          <div class="empty-icon">📋</div>
+          No tasks yet
+        </div>
+      </template>
+
+      <!-- Sessions View -->
+      <template v-else-if="view === 'sessions'">
+        <div class="list-item" v-for="s in sessions" :key="s.session_id"
+             :class="{active: currentSession && currentSession.session_id === s.session_id}"
+             @click="selectSession(s)">
+          <div class="list-item-title mono" style="font-size:12px">{{ s.session_id.slice(0,20) }}...</div>
+          <div class="list-item-meta">
+            <span class="badge" :class="'badge-' + s.status">{{ s.status }}</span>
+            <span>{{ s.model || 'unknown' }}</span>
+            <span>{{ s.cwd ? s.cwd.split('/').pop() : '' }}</span>
+          </div>
+        </div>
+        <div class="empty" v-if="sessions.length === 0">
+          <div class="empty-icon">💬</div>
+          No sessions captured
+        </div>
+      </template>
+    </div>
+
+    <div style="padding: 12px; border-top: 1px solid var(--border)">
+      <button class="primary" style="width: 100%" @click="showNewTask = true">+ 新建任务</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Task View -->
+    <template v-if="view === 'tasks' && currentTask">
+      <div class="main-header">
+        <div class="main-title">{{ currentTask.title }}</div>
+        <div class="main-meta">
+          <span class="badge" :class="'badge-' + currentTask.status">{{ statusText(currentTask.status) }}</span>
+          <span v-if="currentTask.gitRepo">{{ currentTask.gitRepo.split('/').pop() }}</span>
+          <span>{{ currentTask.engine || 'claude' }}</span>
+        </div>
+        <div class="engine-selector">
+          <label>Engine:</label>
+          <button class="engine-btn" :class="{active: currentTask.engine !== 'codex'}"
+                  @click="currentTask.engine = 'claude'">Claude</button>
+          <button class="engine-btn" :class="{active: currentTask.engine === 'codex'}"
+                  @click="currentTask.engine = 'codex'">Codex</button>
+        </div>
+      </div>
+
+      <!-- Final prompt banner -->
+      <div class="final-prompt-banner" v-if="currentTask.finalPrompt && currentTask.status !== 'ready'">
+        <span class="final-prompt-banner-icon">✅</span>
+        <span class="final-prompt-banner-text">
+          <strong>Final prompt 已生成</strong> — {{ currentTask.finalPrompt.length }} 字符
+        </span>
+      </div>
+
+      <div class="panel-tabs">
+        <div class="panel-tab" :class="{active: taskTab === 'chat'}" @click="taskTab = 'chat'">
+          对话 <span class="tab-count">{{ currentTask.conversation ? currentTask.conversation.length / 2 : 0 }}</span>
+        </div>
+        <div class="panel-tab" :class="{active: taskTab === 'prompt'}" @click="taskTab = 'prompt'" v-if="currentTask.finalPrompt">
+          Final Prompt
+        </div>
+        <div class="panel-tab" :class="{active: taskTab === 'execute'}" @click="taskTab = 'execute'">
+          执行配置
+        </div>
+      </div>
+
+      <div class="main-content">
+        <!-- Chat tab -->
+        <template v-if="taskTab === 'chat'">
+          <div class="chat-messages" ref="chatMessages">
+            <div class="message" v-for="(msg, i) in currentTask.conversation" :key="i"
+                 :class="msg.role">
+              <div class="message-header">
+                <span class="message-role">{{ msg.role === 'user' ? 'User' : 'Claude' }}</span>
+              </div>
+              <div class="message-body">
+                <div class="block-text">{{ msg.content }}</div>
+              </div>
+            </div>
+            <div class="message assistant" v-if="loading">
+              <div class="message-header">
+                <span class="message-role">Claude</span>
+              </div>
+              <div class="message-body">
+                <div class="block-text" style="color: var(--muted)">思考中...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Execute config in chat tab -->
+          <div class="execute-config" v-if="currentTask.status === 'ready' || currentTask.status === 'chatting'">
+            <div class="execute-config-title">⚙️ 执行配置</div>
+            <div class="execute-config-grid">
+              <input v-model="executeConfig.gitRepo" placeholder="Git 仓库 URL">
+              <input v-model="executeConfig.gitBranch" placeholder="分支 (默认 main)">
+            </div>
+          </div>
+        </template>
+
+        <!-- Prompt tab -->
+        <template v-else-if="taskTab === 'prompt'">
+          <div class="panel-content">
+            <pre class="block-text" style="white-space: pre-wrap; font-size: 13px; line-height: 1.6">{{ currentTask.finalPrompt }}</pre>
+          </div>
+        </template>
+
+        <!-- Execute tab -->
+        <template v-else-if="taskTab === 'execute'">
+          <div class="panel-content">
+            <div class="form-group">
+              <label>Git 仓库</label>
+              <input v-model="executeConfig.gitRepo" :placeholder="currentTask.gitRepo || 'https://github.com/user/repo.git'">
+            </div>
+            <div class="form-group">
+              <label>分支</label>
+              <input v-model="executeConfig.gitBranch" placeholder="main">
+            </div>
+            <div class="form-group">
+              <label>引擎</label>
+              <select v-model="executeConfig.engine">
+                <option value="claude">Claude</option>
+                <option value="codex">Codex</option>
+              </select>
+            </div>
+            <div style="margin-top: 20px">
+              <button class="success" @click="executeTask" :disabled="executing || !executeConfig.gitRepo">
+                {{ executing ? '提交中...' : '执行任务' }}
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <div class="input-area">
+          <div class="input-row">
+            <textarea v-model="inputMessage" placeholder="输入消息..."
+                      @keyup.enter.exact="sendMessage" :disabled="loading || currentTask.status === 'running'"></textarea>
+            <div class="input-actions">
+              <button class="secondary" @click="showNewTask = true">+</button>
+              <button class="primary" @click="sendMessage" :disabled="loading || !inputMessage.trim() || currentTask.status === 'running'">
+                发送
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Session View -->
+    <template v-else-if="view === 'sessions' && currentSession">
+      <div class="main-header">
+        <div class="main-title mono">{{ currentSession.session_id.slice(0,32) }}...</div>
+        <div class="main-meta">
+          <span class="badge" :class="'badge-' + currentSession.status">{{ currentSession.status }}</span>
+          <span>{{ currentSession.model || 'unknown' }}</span>
+          <span>{{ currentSession.cwd }}</span>
+        </div>
+      </div>
+
+      <div class="session-info-grid">
+        <div class="session-info-item">
+          <span class="session-info-label">Engine</span>
+          <span class="session-info-value">{{ currentSession.model || '-' }}</span>
+        </div>
+        <div class="session-info-item">
+          <span class="session-info-label">Cwd</span>
+          <span class="session-info-value">{{ currentSession.cwd ? currentSession.cwd.split('/').pop() : '-' }}</span>
+        </div>
+        <div class="session-info-item">
+          <span class="session-info-label">Started</span>
+          <span class="session-info-value">{{ formatTime(currentSession.started_at) }}</span>
+        </div>
+        <div class="session-info-item">
+          <span class="session-info-label">Status</span>
+          <span class="session-info-value">{{ currentSession.status }}</span>
+        </div>
+      </div>
+
+      <div class="panel-tabs">
+        <div class="panel-tab" :class="{active: sessionTab === 'messages'}" @click="sessionTab = 'messages'">
+          Messages <span class="tab-count">{{ transcriptMessages.length }}</span>
+        </div>
+        <div class="panel-tab" :class="{active: sessionTab === 'events'}" @click="sessionTab = 'events'">
+          Events <span class="tab-count">{{ events.length }}</span>
+        </div>
+        <div class="panel-tab" :class="{active: sessionTab === 'tools'}" @click="sessionTab = 'tools'">
+          Tools <span class="tab-count">{{ tools.length }}</span>
+        </div>
+      </div>
+
+      <div class="transcript-stat" v-if="sessionTab === 'messages'">
+        <span><span style="color:var(--muted)">User:</span> <strong>{{ transcriptUserCount }}</strong></span>
+        <span><span style="color:var(--muted)">Assistant:</span> <strong>{{ transcriptAssistantCount }}</strong></span>
+        <span><span style="color:var(--muted)">Tool calls:</span> <strong>{{ transcriptToolCount }}</strong></span>
+      </div>
+
+      <div class="main-content">
+        <!-- Messages tab -->
+        <template v-if="sessionTab === 'messages'">
+          <div class="panel-content">
+            <div class="message" v-for="(msg, i) in transcriptMessages" :key="i"
+                 :class="msg.role === 'user' ? 'user' : 'assistant'">
+              <div class="message-header">
+                <span class="message-role">{{ msg.role === 'user' ? 'User' : 'Claude' }}</span>
+                <span class="message-uuid" v-if="msg.uuid">{{ msg.uuid.slice(0, 8) }}</span>
+                <span class="message-time">{{ formatTimeShort(msg.timestamp) }}</span>
+              </div>
+              <div class="message-body">
+                <template v-if="Array.isArray(msg.content)">
+                  <div v-for="(block, bi) in msg.content" :key="bi" class="block" :class="'block-' + block.type">
+                    <div v-if="block.type === 'text'" class="block-text">{{ block.text }}</div>
+                    <div v-else-if="block.type === 'thinking'" class="block-thinking">
+                      <span class="block-thinking-label">💭 Thinking</span>
+                      {{ block.thinking }}
+                    </div>
+                    <div v-else-if="block.type === 'tool_use'" class="block-tool_use">
+                      <div class="block-tool-label">
+                        <span class="tool-name">{{ block.name }}</span>
+                        <span class="tool-id" v-if="block.id">{{ block.id.slice(0,16) }}...</span>
+                      </div>
+                      <div class="tool-input" v-if="block.input && Object.keys(block.input).length">
+                        <div v-for="(val, key) in block.input" :key="key" class="tool-input-row">
+                          <span class="tool-key">{{ key }}:</span>
+                          <span class="tool-val" v-if="val !== null && val !== undefined">
+                            {{ typeof val === 'object' ? JSON.stringify(val).slice(0, 300) : val }}
+                          </span>
+                          <span class="tool-null" v-else>null</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-else-if="block.type === 'tool_result'" class="block-tool_result">
+                      [Result] {{ typeof block.content === 'string' ? block.content.slice(0, 200) : JSON.stringify(block.content).slice(0, 200) }}
+                    </div>
+                  </div>
+                </template>
+                <template v-else-if="typeof msg.content === 'string'">
+                  <div class="block-text">{{ msg.content }}</div>
+                </template>
+                <template v-else-if="msg.thinking">
+                  <div class="block-thinking">
+                    <span class="block-thinking-label">💭 Thinking</span>
+                    {{ msg.thinking }}
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Events tab -->
+        <template v-else-if="sessionTab === 'events'">
+          <div class="panel-content">
+            <div class="message" v-for="(e, i) in events" :key="i" style="border-radius: 6px; margin-bottom: 8px;">
+              <div class="message-body" style="padding: 8px 12px;">
+                <span style="color: var(--green); font-family: monospace; font-size: 12px; min-width: 120px; display: inline-block;">{{ e.event }}</span>
+                <span style="color: var(--muted); font-size: 12px; margin-left: 12px;">{{ e.raw && e.raw.tool_name ? e.raw.tool_name : e.cwd }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Tools tab -->
+        <template v-else-if="sessionTab === 'tools'">
+          <div class="panel-content">
+            <div class="message" v-for="(t, i) in tools" :key="i" style="border-radius: 6px; margin-bottom: 8px;">
+              <div class="message-body">
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                  <span class="tool-name">{{ t.tool_name }}</span>
+                  <span class="badge" :class="t.event === 'PreToolUse' ? 'badge-active' : 'badge-ended'" style="font-size: 10px;">{{ t.event }}</span>
+                  <span v-if="t.is_pre_tool" style="color: var(--blue); font-size: 11px;">pre</span>
+                </div>
+                <div class="tool-input" v-if="t.tool_input && Object.keys(t.tool_input).length" style="margin: 0;">
+                  <div v-for="(val, key) in t.tool_input" :key="key" class="tool-input-row">
+                    <span class="tool-key">{{ key }}:</span>
+                    <span class="tool-val">
+                      <template v-if="val !== null && val !== undefined">
+                        {{ typeof val === 'string' ? val : JSON.stringify(val) }}
+                      </template>
+                      <span class="tool-null" v-else>null</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Empty state -->
+    <template v-else>
+      <div class="welcome">
+        <div class="welcome-icon">🤖</div>
+        <h2>Claude Task</h2>
+        <p>通过 AI 对话规划开发任务，自动执行代码编写。支持 Claude 和 Codex 双引擎。</p>
+        <button class="primary" @click="showNewTask = true">新建任务</button>
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+
+createApp({
+  setup() {
+    const API = window.location.origin;
+    const view = ref('tasks');
+    const tasks = ref([]);
+    const sessions = ref([]);
+    const currentTask = ref(null);
+    const currentSession = ref(null);
+    const inputMessage = ref('');
+    const loading = ref(false);
+    const executing = ref(false);
+    const showNewTask = ref(false);
+    const taskTab = ref('chat');
+    const sessionTab = ref('messages');
+    const stats = ref(null);
+
+    // Data for current session
+    const transcript = ref(null);
+    const events = ref([]);
+    const tools = ref([]);
+    const messages = ref([]);
+
+    const newTask = ref({ title: '', description: '', gitRepo: '', gitBranch: 'main', engine: 'claude' });
+    const executeConfig = ref({ gitRepo: '', gitBranch: 'main', engine: 'claude' });
+
+    // Computed
+    const transcriptMessages = computed(() => {
+      if (transcript.value?.messages) return transcript.value.messages;
+      return messages.value.map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+        uuid: m.uuid
+      }));
+    });
+
+    const transcriptMessageCount = computed(() => transcriptMessages.value.length);
+    const transcriptUserCount = computed(() => transcriptMessages.value.filter(m => m.role === 'user').length);
+    const transcriptAssistantCount = computed(() => transcriptMessages.value.filter(m => m.role === 'assistant').length);
+    const transcriptToolCount = computed(() => {
+      let count = 0;
+      for (const msg of transcriptMessages.value) {
+        if (Array.isArray(msg.content)) {
+          count += msg.content.filter(b => b.type === 'tool_use').length;
+        }
+      }
+      return count;
+    });
+
+    // Utils
+    const statusText = (s) => ({
+      chatting: '对话中', ready: '待执行', running: '运行中',
+      completed: '已完成', failed: '失败', pending: '等待中'
+    }[s] || s);
+
+    const formatTime = (t) => {
+      if (!t) return '';
+      try { return new Date(t).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+      catch { return t; }
+    };
+
+    const formatTimeShort = (t) => {
+      if (!t) return '';
+      try { return new Date(t).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+      catch { return t; }
+    };
+
+    // Load data
+    const loadTasks = async () => {
+      try {
+        const res = await fetch(API + '/api/tasks');
+        tasks.value = (await res.json()) || [];
+      } catch (e) { console.error('load tasks:', e); }
+    };
+
+    const loadSessions = async () => {
+      try {
+        const res = await fetch(API + '/api/sessions');
+        sessions.value = (await res.json()) || [];
+        sessions.value.sort((a, b) => (b.started_at || '').localeCompare(a.started_at || ''));
+      } catch (e) { console.error('load sessions:', e); }
+    };
+
+    const loadStats = async () => {
+      try {
+        const res = await fetch(API + '/api/sessions?fields');
+        stats.value = (await res.json()) || {};
+      } catch (e) {}
+    };
+
+    const selectTask = async (t) => {
+      currentTask.value = { ...t };
+      taskTab.value = 'chat';
+      executeConfig.value = {
+        gitRepo: t.gitRepo || '',
+        gitBranch: t.gitBranch || 'main',
+        engine: t.engine || 'claude'
+      };
+    };
+
+    const selectSession = async (s) => {
+      currentSession.value = s;
+      sessionTab.value = 'messages';
+      transcript.value = null;
+      messages.value = [];
+      events.value = [];
+      tools.value = [];
+      await loadSessionData(s.session_id);
+    };
+
+    const loadSessionData = async (sid) => {
+      try {
+        const [transRes, evtRes, toolRes, msgRes] = await Promise.all([
+          fetch(API + '/api/sessions/' + sid + '/transcript'),
+          fetch(API + '/api/sessions/' + sid + '/events'),
+          fetch(API + '/api/sessions/' + sid + '/tools'),
+          fetch(API + '/api/sessions/' + sid + '/messages')
+        ]);
+
+        const t = await transRes.json();
+        if (t && !t.error && t.messages) {
+          transcript.value = t;
+        } else {
+          messages.value = (await msgRes.json()) || [];
+        }
+        events.value = (await evtRes.json()) || [];
+        tools.value = (await toolRes.json()) || [];
+      } catch (e) { console.error('load session data:', e); }
+    };
+
+    const createTask = async () => {
+      try {
+        const body = { ...newTask.value, gitBranch: newTask.value.gitBranch || 'main' };
+        const res = await fetch(API + '/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const task = await res.json();
+        tasks.value.unshift(task);
+        selectTask(task);
+        showNewTask.value = false;
+        newTask.value = { title: '', description: '', gitRepo: '', gitBranch: 'main', engine: 'claude' };
+
+        if (task.description) {
+          inputMessage.value = task.description;
+          await sendMessage();
+        }
+      } catch (e) { console.error('create task:', e); }
+    };
+
+    const sendMessage = async () => {
+      if (!inputMessage.value.trim() || loading.value || !currentTask.value) return;
+      const msg = inputMessage.value.trim();
+      inputMessage.value = '';
+      loading.value = true;
+
+      // Optimistic UI
+      if (!currentTask.value.conversation) currentTask.value.conversation = [];
+      currentTask.value.conversation.push({ role: 'user', content: msg });
+
+      try {
+        const res = await fetch(API + '/api/tasks/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: currentTask.value.id, message: msg })
+        });
+        const data = await res.json();
+        if (data.reply) {
+          currentTask.value.conversation.push({ role: 'assistant', content: data.reply });
+          if (data.isFinal) {
+            currentTask.value.status = 'ready';
+            // Refresh to get final prompt
+            const taskRes = await fetch(API + '/api/tasks/' + currentTask.value.id);
+            const updated = await taskRes.json();
+            currentTask.value.finalPrompt = updated.finalPrompt;
+          }
+        }
+      } catch (e) {
+        console.error('chat error:', e);
+        currentTask.value.conversation.push({ role: 'assistant', content: '请求失败: ' + e.message });
+      }
+      loading.value = false;
+    };
+
+    const executeTask = async () => {
+      if (executing.value) return;
+      executing.value = true;
+      try {
+        const body = {
+          taskId: currentTask.value.id,
+          gitRepo: executeConfig.value.gitRepo || currentTask.value.gitRepo,
+          gitBranch: executeConfig.value.gitBranch || 'main',
+          engine: executeConfig.value.engine || 'claude'
+        };
+        const res = await fetch(API + '/api/tasks/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        currentTask.value.status = 'running';
+        currentTask.value.jobName = data.jobName;
+      } catch (e) {
+        alert('执行失败: ' + e.message);
+      }
+      executing.value = false;
+    };
+
+    // Poll
+    const refresh = async () => {
+      await loadSessions();
+      await loadStats();
+      if (currentTask.value?.status === 'running') {
+        await loadTasks();
+        const t = tasks.value.find(t => t.id === currentTask.value.id);
+        if (t) currentTask.value.status = t.status;
+      }
+      if (currentSession.value) {
+        await loadSessionData(currentSession.value.session_id);
+      }
+    };
+
+    onMounted(() => {
+      loadTasks();
+      loadSessions();
+      loadStats();
+      setInterval(refresh, 3000);
+    });
+
+    return {
+      view, tasks, sessions, currentTask, currentSession,
+      inputMessage, loading, executing, showNewTask, taskTab, sessionTab, stats,
+      transcript, events, tools, messages,
+      transcriptMessages, transcriptMessageCount, transcriptUserCount, transcriptAssistantCount, transcriptToolCount,
+      newTask, executeConfig,
+      statusText, formatTime, formatTimeShort,
+      selectTask, selectSession, createTask, sendMessage, executeTask
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
