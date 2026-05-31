@@ -1,0 +1,66 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Worker
+        id: meta-worker
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/worker
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest
+
+      - name: Build and push Worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./container
+          push: true
+          tags: ${{ steps.meta-worker.outputs.tags }}
+          labels: ${{ steps.meta-worker.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+
+      - name: Extract metadata for Server
+        id: meta-server
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/server
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest
+
+      - name: Build and push Server image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: ./docker/Dockerfile.server
+          push: true
+          tags: ${{ steps.meta-server.outputs.tags }}
+          labels: ${{ steps.meta-server.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
