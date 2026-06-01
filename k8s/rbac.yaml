@@ -3,14 +3,14 @@ kind: ServiceAccount
 metadata:
   name: callmyagent-sa
   labels:
-    app: claude-task
+    app: callmyagent
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: claude-task-role
+  name: callmyagent-role
   labels:
-    app: claude-task
+    app: callmyagent
 rules:
   - apiGroups: ["batch"]
     resources: ["jobs"]
@@ -25,14 +25,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: claude-task-rolebinding
+  name: callmyagent-rolebinding
   labels:
-    app: claude-task
+    app: callmyagent
 subjects:
   - kind: ServiceAccount
     name: callmyagent-sa
     namespace: default
 roleRef:
   kind: Role
-  name: claude-task-role
+  name: callmyagent-role
   apiGroup: rbac.authorization.k8s.io

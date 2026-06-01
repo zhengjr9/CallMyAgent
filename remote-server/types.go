@@ -30,19 +30,19 @@ type Message struct {
 }
 
 type Transcript struct {
-	SessionID    string                 `json:"session_id"`
-	Cwd          string                 `json:"cwd"`
-	Messages     []TranscriptMessage    `json:"messages"`
-	MessageCount int                    `json:"message_count"`
-	Timestamp    string                `json:"timestamp"`
+	SessionID    string              `json:"session_id"`
+	Cwd          string              `json:"cwd"`
+	Messages     []TranscriptMessage `json:"messages"`
+	MessageCount int                 `json:"message_count"`
+	Timestamp    string              `json:"timestamp"`
 }
 
 type TranscriptMessage struct {
-	Role      string          `json:"role"`
-	Content   interface{}    `json:"content"` // can be string or ContentBlock[]
-	Timestamp string          `json:"timestamp"`
-	Uuid      string          `json:"uuid,omitempty"`
-	Thinking  string          `json:"thinking,omitempty"`
+	Role      string      `json:"role"`
+	Content   interface{} `json:"content"` // can be string or ContentBlock[]
+	Timestamp string      `json:"timestamp"`
+	Uuid      string      `json:"uuid,omitempty"`
+	Thinking  string      `json:"thinking,omitempty"`
 }
 
 type ToolUsage struct {

@@ -1,169 +1,141 @@
-# CallMyAgent - Unified AI Development Platform
+# CallMyAgent
 
-## Overview
+CallMyAgent is a Kubernetes-based AI development platform for planning, dispatching, and observing AI coding agents. A built-in meta agent turns user requirements into a complete execution prompt, then a worker pod runs the selected engine against a Git repository.
 
-CallMyAgent is a Kubernetes-based AI development platform that supports **5 AI engines** for automated code development through natural conversation planning. It provides a web UI for task management, meta conversation with AI to refine requirements, and automated execution via Kubernetes Jobs.
+## What It Does
+
+- Uses a Claude-compatible meta agent to refine requirements and produce a `<final-prompt>...</final-prompt>`.
+- Supports Claude Code, Codex CLI, OpenCode, Hermes Agent, and OpenClaw as execution engines.
+- Runs each task as a Kubernetes Job with isolated workspace, prompt ConfigMap, and optional output PVC.
+- Can also run tasks locally through Docker for development and single-node smoke tests.
+- Captures Claude Code hook events, session transcripts, messages, and tool calls through the remote hook server.
+- Provides a compact Vue UI styled after the new-api admin console: light workspace, left navigation, task/session panes, and engine import cards.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Web UI (Vue 3 SPA)                        │
-│   ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
-│   │  Tasks      │  │  Sessions   │  │  Transcript Viewer      │ │
-│   │  Planning   │  │  History    │  │  (Full Message Tree)    │ │
-│   └─────────────┘  └─────────────┘  └─────────────────────────┘ │
-└────────────────────────────┬────────────────────────────────────┘
-                            │ HTTP API
-         ┌──────────────────┴──────────────────┐
-         │                                     │
-   ┌─────┴──────┐                       ┌──────┴─────┐
-   │   Task     │                       │   Remote    │
-   │   Server   │                       │   Server    │
-   │  :8080     │                       │  :9090      │
-   │            │                       │            │
-   │ Meta Chat  │                       │ Hook Events│
-   │ (CLI+Hooks)│                       │ Sessions   │
-   │ K8s Job    │                       │ Transcripts│
-   │ Management │                       │            │
-   └─────┬──────┘                       └────────────┘
-         │
-         │ K8s Job
-         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Worker Pod (callmyagent-worker)               │
-│   ┌────────────────────────────────────────────────────────────┐ │
-│   │ Container: linux/amd64                                      │ │
-│   │  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐│ │
-│   │  │   Claude   │  │   Codex    │  │   OpenCode/Hermes/    ││ │
-│   │  │   CLI      │  │   CLI      │  │   OpenClaw CLI       ││ │
-│   │  └────────────┘  └────────────┘  └──────────────────────┘│ │
-│   │  Remote Hooks: SessionStart → Resume detection             │ │
-│   │               Stop → Full transcript push                   │ │
-│   │  Skills: superpower capabilities                            │ │
-│   └────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+```text
+Web UI
+  -> Task Server :8080
+       -> Meta Agent: Claude Code CLI when available, HTTP Anthropic-compatible API as fallback
+       -> Kubernetes Job
+            -> Worker image
+                 -> claude | codex | opencode | hermes | openclaw
+  -> Remote Server :9090
+       -> Hook events, transcripts, session history
 ```
 
-## Features
+## Engines
 
-- [x] **Meta Agent** - Built-in Claude Code CLI with remote hooks for rich task planning with actual tool access
-- [x] Multi-round chat with final prompt extraction
-- [x] **5 Engine Support** - Claude, Codex, OpenCode, Hermes, OpenClaw
-- [x] Kubernetes Job execution for automated development
-- [x] Remote hooks for session event capture
-- [x] Full transcript storage with universal format
-- [x] Session resumption across engine restarts
-- [x] Superpower skills in worker container
+| Engine | Command | Install | Configuration |
+| --- | --- | --- | --- |
+| Claude Code | `claude` | `npm install -g @anthropic-ai/claude-code` | `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `CLAUDE_MODEL` |
+| Codex CLI | `codex` | `npm install -g @openai/codex` | `CODEX_API_KEY`/`OPENAI_API_KEY`, `CODEX_BASE_URL`/`OPENAI_BASE_URL`, `CODEX_MODEL`/`OPENAI_MODEL` |
+| OpenCode | `opencode` | `curl -fsSL https://opencode.ai/install \| bash` or `npm install -g opencode-ai` | dynamic `callmyagent` custom provider from `OPENAI_*`; optional `OPENCODE_MODEL` |
+| Hermes Agent | `hermes` | `curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh \| bash` | `ANTHROPIC_*` by default when present; `HERMES_PROVIDER=custom` for OpenAI-compatible `OPENAI_*` |
+| OpenClaw | `openclaw` | `curl -fsSL https://openclaw.ai/install.sh \| bash` or `npm i -g openclaw` | dynamic `callmyagent` custom provider from `OPENAI_*`; optional `OPENCLAW_MODEL` |
 
-## Engine Comparison
+References checked while updating this repo:
 
-| Engine | CLI | Install | Non-interactive |
-|--------|-----|---------|----------------|
-| Claude | `claude -p "prompt"` | npm install -g @anthropic-ai/claude-code | `--output-format json` |
-| Codex | `codex exec --json --ephemeral` | npm install -g @opencode/codex | `--json` |
-| OpenCode | `opencode -p "prompt" -f json` | curl script | `-f json` |
-| Hermes | `hermes -z "prompt" --max-turns N` | curl script | structured output |
-| OpenClaw | `openclaw exec "prompt"` | npm install -g openclaw | json output |
+- OpenCode install/config: https://pkg.go.dev/github.com/sst/opencode and https://opencode.ai/docs
+- Hermes Agent quick install: https://github.com/NousResearch/hermes-agent
+- OpenClaw install/onboarding: https://clawdocs.org/getting-started/installation/
+- Codex CLI: https://github.com/openai/codex
+- Claude Code: https://docs.anthropic.com/en/docs/claude-code
 
-## Meta Agent Design
+## Meta Agent
 
-The meta agent uses **Claude Code CLI directly** with remote hooks instead of HTTP API calls. This gives it:
+The task server uses `META_AGENT_MODE`:
 
-1. **Real tool access** - Can read files, glob patterns, run bash commands during planning
-2. **Streaming events** - Every tool use, message, and session event is pushed via hooks
-3. **Rich context** - Full transcript available for analysis
-4. **Consistent UX** - Same interface as execution engines
+- `auto` (default): use local `claude` CLI if it is installed, otherwise call the Anthropic-compatible HTTP API.
+- `cli`: force Claude Code CLI.
+- `http`: force direct HTTP.
 
-### Meta Agent Flow
+For HTTP mode, set:
 
-```
-User Input → Frontend → Task Server → Claude Code CLI (local)
-                                              ↓
-                                    Remote Hook Events
-                                              ↓
-                                    Remote Server (store)
-                                              ↓
-                                    Frontend Sessions View
+```bash
+export ANTHROPIC_API_KEY=...
+export ANTHROPIC_BASE_URL=https://api.anthropic.com
+export CLAUDE_MODEL=claude-sonnet-4-5-20250514
 ```
 
-The meta agent runs Claude Code in non-interactive mode with:
-- `--output-format json` for structured output
-- Hooks configured to push events to remote server
-- Custom system prompt for task refinement
+For Claude Code CLI mode, install `claude` on the server host or include it in the server image. Remote hook capture can be enabled with:
 
-## API Endpoints
-
-### Task Server (Port 8080)
-- `POST /api/tasks` - Create task
-- `GET /api/tasks` - List tasks
-- `POST /api/tasks/chat` - Chat with meta Claude
-- `POST /api/tasks/execute` - Execute via K8s Job
-- `GET /api/tasks/{id}` - Get task details
-
-### Remote Server (Port 9090)
-- `POST /api/events` - Hook event capture
-- `POST /api/sessions` - Register/resume session
-- `GET /api/sessions` - List sessions
-- `GET /api/sessions/{id}/transcript` - Full transcript
-- `GET /api/sessions/{id}/messages` - Session messages
-- `GET /api/sessions/{id}/tools` - Tool calls
+```bash
+export CLAUDE_REMOTE_URL=http://localhost:9090
+```
 
 ## Quick Start
 
 ```bash
-# Build everything
 make build
 
-# Start servers
-FRONTEND_DIR=./frontend ./build/remote-server &
-PORT=8080 ./build/server &
-
-# Open UI
-open http://localhost:8080
+FRONTEND_DIR=./frontend PORT=9090 go run ./remote-server &
+PORT=8080 META_AGENT_MODE=auto go run ./backend
 ```
 
-## Environment Variables
+Open http://localhost:8080.
 
-| Variable | Server | Description |
-|----------|--------|-------------|
-| `ANTHROPIC_API_KEY` | Both | Claude API key |
-| `ANTHROPIC_AUTH_TOKEN` | Both | Auth token for proxy |
-| `ANTHROPIC_BASE_URL` | Both | API endpoint |
-| `CLAUDE_MODEL` | Both | Model name |
-| `CODEX_API_KEY` | Worker | Codex API key |
-| `CLAUDE_REMOTE_URL` | Hook | Remote server URL |
-| `KUBECONFIG` | Server | Kubernetes config |
+## OpenAI-Compatible Codex Example
 
-## File Structure
+Use environment variables instead of writing keys into files:
 
+```bash
+export CODEX_BASE_URL=https://one-openapi.cloud/v1
+export CODEX_MODEL=deepseek-v4-flash
+export CODEX_API_KEY=...
 ```
-.
-├── backend/              # Task server (Go)
-│   ├── main.go
-│   ├── handler.go        # HTTP handlers
-│   ├── store.go          # Memory task store
-│   ├── k8s.go            # K8s Job creation
-│   ├── claude.go         # Claude API client
-│   └── types.go          # Data types
-├── remote-server/        # Session/hook server (Go)
-│   ├── main.go
-│   ├── handler.go
-│   ├── store.go          # Universal session store
-│   └── types.go
-├── container/            # Worker container
-│   ├── Dockerfile
-│   ├── scripts/
-│   │   ├── entrypoint.sh
-│   │   └── remote-hook.sh
-│   ├── skills/           # Superpower skills
-│   └── settings/
-│       ├── settings.json    # Claude settings
-│       └── codex.toml       # Codex config
-├── frontend/
-│   └── index.html        # Vue 3 SPA
-├── hooks/
-│   ├── remote-hook.sh
-│   └── example-settings.json
-└── Makefile
+
+The worker normalizes these into `OPENAI_BASE_URL`, `OPENAI_MODEL`, and `OPENAI_API_KEY` for CLIs that expect OpenAI-compatible names.
+
+## Scheduling
+
+CallMyAgent supports two execution modes:
+
+- `SCHEDULER_MODE=job`: create a Kubernetes Job. This is the production/default mode.
+- `SCHEDULER_MODE=docker`: run `docker run -d` on the local host. This is useful for local development and page-to-worker smoke tests.
+
+Docker mode uses these settings:
+
+```bash
+export SCHEDULER_MODE=docker
+export CONTAINER_IMAGE=callmyagent-worker:local
+export DOCKER_RUNS_DIR=/tmp/callmyagent-runs
+```
+
+The page execution form also sends `schedulerMode`, so a single server can accept either `docker` or `job` per task.
+
+## Custom Providers
+
+When `OPENAI_BASE_URL`, `OPENAI_MODEL`, and `OPENAI_API_KEY` are present, the worker creates runtime-only provider configs:
+
+- OpenCode: `/tmp/callmyagent-opencode.json`, provider `callmyagent`, model `callmyagent/<OPENAI_MODEL>`.
+- OpenClaw: `/tmp/callmyagent-openclaw.json`, provider `callmyagent`, model `callmyagent/<OPENAI_MODEL>`.
+- Hermes: `~/.hermes/config.yaml`, provider `custom`, model `<OPENAI_MODEL>` when `HERMES_PROVIDER=custom` or no Anthropic credentials are present.
+
+If `ANTHROPIC_API_KEY` is set and `HERMES_PROVIDER` is not set, Hermes uses its native `anthropic` provider because that path is more reliable with Anthropic-compatible MiniMax endpoints. OpenCode still normalizes `ANTHROPIC_BASE_URL` to include `/v1` when using Anthropic directly.
+
+## Kubernetes
+
+```bash
+kubectl apply -f k8s/rbac.yaml
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/pvc.yaml
+kubectl apply -f k8s/deployment.yaml
+```
+
+Update `k8s/secret.yaml` with real secrets before deploying. Do not commit real keys.
+
+## Local Verification
+
+```bash
+go test ./backend
+go test ./remote-server
+make build-server
+```
+
+To verify agent binaries inside the worker image:
+
+```bash
+docker build -t callmyagent-worker:local -f container/Dockerfile container/
+docker run --rm callmyagent-worker:local bash -lc 'claude --version; codex --version; opencode --version; hermes --version; openclaw --version'
 ```

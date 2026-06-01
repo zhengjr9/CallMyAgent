@@ -36,8 +36,19 @@ spec:
                   key: api-key
             - name: ANTHROPIC_BASE_URL
               value: "https://api.minimaxi.com/anthropic"
+            - name: CODEX_BASE_URL
+              value: "https://one-openapi.cloud/v1"
+            - name: CODEX_MODEL
+              value: "deepseek-v4-flash"
+            - name: CODEX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: callmyagent-api-secret
+                  key: codex-api-key
             - name: CONTAINER_IMAGE
               value: "ghcr.io/zhengjr9/callmyagent/worker:latest"
+            - name: META_AGENT_MODE
+              value: "auto"
             - name: K8S_NAMESPACE
               valueFrom:
                 fieldRef:

@@ -1,4 +1,4 @@
-module github.com/workspace/claude-task
+module github.com/workspace/callmyagent
 
 go 1.21
 

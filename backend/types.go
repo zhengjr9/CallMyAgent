@@ -4,7 +4,12 @@ type Config struct {
 	Port             string
 	AnthropicAPIKey  string
 	AnthropicBaseURL string
+	CodexAPIKey      string
+	CodexBaseURL     string
+	CodexModel       string
 	ContainerImage   string
+	SchedulerMode    string
+	DockerRunsDir    string
 	K8sNamespace     string
 	GitRepoURL       string
 	GitBranch        string
@@ -17,19 +22,22 @@ type Config struct {
 }
 
 type Task struct {
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	GitRepo      string    `json:"gitRepo"`
-	GitBranch    string    `json:"gitBranch"`
-	Engine       string    `json:"engine"` // "claude", "codex", "opencode", "hermes", "openclaw"
-	Status       string    `json:"status"` // pending, chatting, ready, running, completed, failed
-	Conversation []Message `json:"conversation"`
-	FinalPrompt  string    `json:"finalPrompt,omitempty"`
+	ID            string    `json:"id"`
+	Title         string    `json:"title"`
+	Description   string    `json:"description"`
+	GitRepo       string    `json:"gitRepo"`
+	GitBranch     string    `json:"gitBranch"`
+	Engine        string    `json:"engine"` // "claude", "codex", "opencode", "hermes", "openclaw"
+	Status        string    `json:"status"` // pending, chatting, ready, running, completed, failed
+	Conversation  []Message `json:"conversation"`
+	FinalPrompt   string    `json:"finalPrompt,omitempty"`
 	JobName       string    `json:"jobName,omitempty"`
+	SchedulerMode string    `json:"schedulerMode,omitempty"` // job/k8s, docker
 	ErrorMessage  string    `json:"errorMessage,omitempty"`
-	CreatedAt    string    `json:"createdAt"`
-	UpdatedAt    string    `json:"updatedAt"`
+	MaxTurns      int       `json:"maxTurns,omitempty"`
+	BudgetUSD     float64   `json:"budgetUsd,omitempty"`
+	CreatedAt     string    `json:"createdAt"`
+	UpdatedAt     string    `json:"updatedAt"`
 }
 
 type Message struct {
@@ -49,12 +57,13 @@ type ChatResponse struct {
 }
 
 type ExecuteRequest struct {
-	TaskID    string `json:"taskId"`
-	GitRepo   string `json:"gitRepo"`
-	GitBranch string `json:"gitBranch"`
-	Engine    string `json:"engine"` // "claude" or "codex"
-	MaxTurns  int    `json:"maxTurns,omitempty"`
-	BudgetUSD float64 `json:"budgetUsd,omitempty"`
+	TaskID        string  `json:"taskId"`
+	GitRepo       string  `json:"gitRepo"`
+	GitBranch     string  `json:"gitBranch"`
+	Engine        string  `json:"engine"` // claude, codex, opencode, hermes, openclaw
+	MaxTurns      int     `json:"maxTurns,omitempty"`
+	BudgetUSD     float64 `json:"budgetUsd,omitempty"`
+	SchedulerMode string  `json:"schedulerMode,omitempty"` // job/k8s, docker
 }
 
 type ExecuteResponse struct {
@@ -69,6 +78,18 @@ type CreateTaskRequest struct {
 	GitRepo     string `json:"gitRepo,omitempty"`
 	GitBranch   string `json:"gitBranch,omitempty"`
 	Engine      string `json:"engine,omitempty"`
+}
+
+type EngineInfo struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Command         string   `json:"command"`
+	Install         []string `json:"install"`
+	Config          []string `json:"config"`
+	DocsURL         string   `json:"docsUrl"`
+	RepositoryURL   string   `json:"repositoryUrl"`
+	NonInteractive  string   `json:"nonInteractive"`
+	RequiresAPIKeys []string `json:"requiresApiKeys"`
 }
 
 // Anthropic API types

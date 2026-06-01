@@ -119,9 +119,12 @@ func RunMetaAgent(cfg *Config, messages []Message, remoteURL string) (string, er
 
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("ANTHROPIC_API_KEY=%s", cfg.AnthropicAPIKey),
+		fmt.Sprintf("ANTHROPIC_BASE_URL=%s", cfg.AnthropicBaseURL),
 		fmt.Sprintf("ANTHROPIC_AUTH_TOKEN=%s", cfg.ClaudeAPIToken),
-		fmt.Sprintf("HOME=/home/claude"),
 	)
+	if cfg.ClaudeBaseURL != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("CLAUDE_BASE_URL=%s", cfg.ClaudeBaseURL))
+	}
 
 	if remoteURL != "" {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("CLAUDE_REMOTE_URL=%s", remoteURL))
@@ -148,7 +151,7 @@ func RunMetaAgent(cfg *Config, messages []Message, remoteURL string) (string, er
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
-	}
+		}
 
 		// Try to parse as JSON
 		var result map[string]interface{}

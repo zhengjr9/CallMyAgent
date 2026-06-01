@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -71,8 +72,24 @@ func (h *Handler) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if we should use CLI-based meta agent
-	useCLI := os.Getenv("USE_META_CLI") == "true"
+	if strings.TrimSpace(req.Message) == "" {
+		http.Error(w, "message is required", http.StatusBadRequest)
+		return
+	}
+
+	// Add the user message before calling the meta agent so the planner sees it.
+	task.Conversation = append(task.Conversation, Message{
+		Role:    "user",
+		Content: req.Message,
+	})
+
+	// Prefer the built-in Claude Code CLI meta agent when available; fall back to HTTP.
+	metaMode := getEnv("META_AGENT_MODE", "auto")
+	useCLI := os.Getenv("USE_META_CLI") == "true" || metaMode == "cli"
+	if metaMode == "auto" {
+		_, cliErr := exec.LookPath("claude")
+		useCLI = cliErr == nil
+	}
 	remoteURL := os.Getenv("CLAUDE_REMOTE_URL")
 
 	var reply string
@@ -88,15 +105,11 @@ func (h *Handler) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("Meta agent error: %v", err)
+		task.Conversation = task.Conversation[:len(task.Conversation)-1]
+		h.store.Update(task)
 		http.Error(w, "failed to call meta agent: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// Add user message
-	task.Conversation = append(task.Conversation, Message{
-		Role:    "user",
-		Content: req.Message,
-	})
 
 	// Add assistant reply
 	task.Conversation = append(task.Conversation, Message{
@@ -164,30 +177,46 @@ func (h *Handler) handleExecute(w http.ResponseWriter, r *http.Request) {
 	if task.Engine == "" {
 		task.Engine = "claude"
 	}
+	if !IsSupportedEngine(task.Engine) {
+		http.Error(w, "unsupported engine: "+task.Engine, http.StatusBadRequest)
+		return
+	}
+	if req.MaxTurns > 0 {
+		task.MaxTurns = req.MaxTurns
+	}
+	if req.BudgetUSD > 0 {
+		task.BudgetUSD = req.BudgetUSD
+	}
+	if req.SchedulerMode != "" {
+		task.SchedulerMode = normalizeSchedulerMode(req.SchedulerMode)
+	}
+	if task.SchedulerMode == "" {
+		task.SchedulerMode = normalizeSchedulerMode(h.cfg.SchedulerMode)
+	}
 
-	if task.GitRepo == "" {
+	if task.GitRepo == "" && task.SchedulerMode != "docker" {
 		http.Error(w, "git repo URL is required", http.StatusBadRequest)
 		return
 	}
 
-	// Create K8s job (engine passed via task.Engine)
-	jobName, err := CreateClaudeJob(h.cfg, task)
+	runName, schedulerMode, err := createScheduledRun(h.cfg, task)
 	if err != nil {
-		log.Printf("Failed to create job: %v", err)
+		log.Printf("Failed to schedule task: %v", err)
 		task.Status = "failed"
 		task.ErrorMessage = err.Error()
 		h.store.Update(task)
-		http.Error(w, "failed to create job: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to schedule task: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	task.JobName = jobName
+	task.JobName = runName
+	task.SchedulerMode = schedulerMode
 	task.Status = "running"
 	h.store.Update(task)
 
 	resp := ExecuteResponse{
 		TaskID:  task.ID,
-		JobName: jobName,
+		JobName: runName,
 		Status:  "running",
 	}
 
@@ -206,6 +235,10 @@ func (h *Handler) createTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "title is required", http.StatusBadRequest)
 		return
 	}
+	if req.Engine != "" && !IsSupportedEngine(req.Engine) {
+		http.Error(w, "unsupported engine: "+req.Engine, http.StatusBadRequest)
+		return
+	}
 
 	task := h.store.Create(req.Title, req.Description, req.GitRepo, req.GitBranch, req.Engine)
 
@@ -214,8 +247,20 @@ func (h *Handler) createTask(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(task)
 }
 
+func (h *Handler) handleEngines(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(engineCatalog)
+}
+
 func (h *Handler) listTasks(w http.ResponseWriter, r *http.Request) {
 	tasks := h.store.List()
+	for _, task := range tasks {
+		h.refreshTaskStatus(task)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tasks)
 }
@@ -242,18 +287,22 @@ func (h *Handler) getTaskStatus(w http.ResponseWriter, r *http.Request, taskID s
 		return
 	}
 
-	// If job is running, check K8s status
-	if task.Status == "running" && task.JobName != "" {
-		status, err := GetJobStatus(h.cfg, task.JobName)
-		if err == nil && status != task.Status {
-			task.Status = status
-			h.store.Update(task)
-		}
-	}
+	h.refreshTaskStatus(task)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"taskId": task.ID,
 		"status": task.Status,
 	})
+}
+
+func (h *Handler) refreshTaskStatus(task *Task) {
+	if task.Status != "running" || task.JobName == "" {
+		return
+	}
+	status, err := getScheduledRunStatus(h.cfg, task)
+	if err == nil && status != task.Status {
+		task.Status = status
+		h.store.Update(task)
+	}
 }

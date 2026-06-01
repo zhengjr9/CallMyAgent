@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,16 +40,7 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 
 	jobName := fmt.Sprintf("callmyagent-%s", task.ID)
 
-	// Build the prompt file content
-	promptContent := task.FinalPrompt
-	if promptContent == "" {
-		// Build prompt from conversation
-		var sb strings.Builder
-		for _, msg := range task.Conversation {
-			sb.WriteString(fmt.Sprintf("[%s]: %s\n\n", msg.Role, msg.Content))
-		}
-		promptContent = sb.String()
-	}
+	promptContent := taskPrompt(task)
 
 	// Create ConfigMap for the prompt
 	configMap := &corev1.ConfigMap{
@@ -82,14 +72,42 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 				Key:                  "api-key",
 			},
 		}},
-		{Name: "CLAUDE_TASK_ID", Value: task.ID},
+		{Name: "CALLMYAGENT_TASK_ID", Value: task.ID},
 		{Name: "GIT_REPO", Value: task.GitRepo},
 		{Name: "GIT_BRANCH", Value: task.GitBranch},
 		{Name: "TASK_ENGINE", Value: task.Engine},
 	}
+	envVars[0].ValueFrom.SecretKeyRef.Name = "callmyagent-api-secret"
 
 	if cfg.AnthropicBaseURL != "" && cfg.AnthropicBaseURL != "https://api.anthropic.com" {
 		envVars = append(envVars, corev1.EnvVar{Name: "ANTHROPIC_BASE_URL", Value: cfg.AnthropicBaseURL})
+	}
+	if cfg.CodexBaseURL != "" {
+		envVars = append(envVars, corev1.EnvVar{Name: "OPENAI_BASE_URL", Value: cfg.CodexBaseURL})
+		envVars = append(envVars, corev1.EnvVar{Name: "CODEX_BASE_URL", Value: cfg.CodexBaseURL})
+	}
+	if cfg.CodexModel != "" {
+		envVars = append(envVars, corev1.EnvVar{Name: "OPENAI_MODEL", Value: cfg.CodexModel})
+		envVars = append(envVars, corev1.EnvVar{Name: "CODEX_MODEL", Value: cfg.CodexModel})
+	}
+	if cfg.CodexAPIKey != "" {
+		envVars = append(envVars, corev1.EnvVar{Name: "OPENAI_API_KEY", Value: cfg.CodexAPIKey})
+		envVars = append(envVars, corev1.EnvVar{Name: "CODEX_API_KEY", Value: cfg.CodexAPIKey})
+	} else {
+		envVars = append(envVars, corev1.EnvVar{Name: "OPENAI_API_KEY", ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "callmyagent-api-secret"},
+				Key:                  "codex-api-key",
+				Optional:             boolPtr(true),
+			},
+		}})
+		envVars = append(envVars, corev1.EnvVar{Name: "CODEX_API_KEY", ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "callmyagent-api-secret"},
+				Key:                  "codex-api-key",
+				Optional:             boolPtr(true),
+			},
+		}})
 	}
 
 	if cfg.ClaudeAPIToken != "" {
@@ -141,12 +159,7 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 		})
 	}
 
-	maxTurns := 20
-	budgetUSD := 5.0
-	if task.FinalPrompt != "" {
-		maxTurns = 50
-		budgetUSD = 10.0
-	}
+	maxTurns, budgetUSD := taskLimits(task)
 
 	// Job definition
 	backoffLimit := int32(1)
@@ -164,22 +177,22 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 			},
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit:          &backoffLimit,
-			ActiveDeadlineSeconds: &activeDeadlineSeconds,
+			BackoffLimit:            &backoffLimit,
+			ActiveDeadlineSeconds:   &activeDeadlineSeconds,
 			TTLSecondsAfterFinished: &ttlSeconds,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":       "claude-task",
-						"task-id":   task.ID,
+						"app":     "callmyagent",
+						"task-id": task.ID,
 					},
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
-							Name:  "callmyagent-worker",
-							Image: cfg.ContainerImage,
+							Name:    "callmyagent-worker",
+							Image:   cfg.ContainerImage,
 							Command: []string{"/bin/bash", "/scripts/entrypoint.sh"},
 							Env: append(envVars,
 								corev1.EnvVar{Name: "MAX_TURNS", Value: fmt.Sprintf("%d", maxTurns)},
@@ -212,6 +225,10 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 
 	log.Printf("Created K8s job: %s for task: %s", jobName, task.ID)
 	return jobName, nil
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }
 
 func GetJobStatus(cfg *Config, jobName string) (string, error) {

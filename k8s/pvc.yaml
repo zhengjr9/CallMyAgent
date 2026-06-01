@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: claude-task-output
+  name: callmyagent-output
   labels:
-    app: claude-task
+    app: callmyagent
 spec:
   accessModes:
     - ReadWriteOnce

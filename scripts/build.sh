@@ -8,7 +8,7 @@ REGISTRY="${REGISTRY:-docker.io/library}"
 VERSION="${VERSION:-$(date +%Y%m%d-%H%M%S)}"
 
 echo "=========================================="
-echo "  Claude Task - Build Script"
+echo "  CallMyAgent - Build Script"
 echo "=========================================="
 echo "Registry: $REGISTRY"
 echo "Version:  $VERSION"
@@ -18,7 +18,7 @@ echo ""
 echo "[1/4] Building Go server..."
 cd "$PROJECT_DIR/backend"
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-s -w" -o "$PROJECT_DIR/build/server" ./main.go
+    go build -ldflags="-s -w" -o "$PROJECT_DIR/build/server" .
 echo "  -> build/server"
 
 # Step 2: Build server Docker image

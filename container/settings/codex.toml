@@ -1,23 +1,6 @@
-# Codex Configuration
-# This is used when TASK_ENGINE=codex
+# Codex CLI config for CallMyAgent workers.
+# Runtime credentials and model selection are passed via environment variables
+# and command-line flags in /scripts/entrypoint.sh.
 
-[api]
-# API key is passed via CODEX_API_KEY environment variable in the K8s secret
-
-[hooks]
-# Hooks are configured at runtime via entrypoint.sh when CLAUDE_REMOTE_URL is set
-
-[sandbox]
-# Sandbox settings for codex exec
-mode = "workspace-write"
-
-[exec]
-# Default exec settings
-ephemeral = true
-json = true
-max_turns = 50
-
-[model]
-# Default model (can be overridden via CLI flags)
-provider = "anthropic"
-model = "claude-sonnet-4-6"
+sandbox_mode = "workspace-write"
+approval_policy = "never"

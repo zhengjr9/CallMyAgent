@@ -9,28 +9,29 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --background: #0d1117;
-      --foreground: #e6edf3;
-      --surface: #161b22;
-      --surface2: #21262d;
-      --surface3: #30363d;
-      --border: #30363d;
-      --border-light: #21262d;
-      --text: #e6edf3;
-      --muted: #8b949e;
-      --primary: #58a6ff;
-      --primary-dim: #1f6feb;
-      --secondary: #8b949e;
-      --accent: #bc8cff;
-      --success: #3fb950;
-      --success-dim: #238636;
-      --destructive: #f85149;
-      --warning: #d29922;
-      --info: #79c0ff;
-      --pink: #db61a2;
+      --background: #f6f8fb;
+      --foreground: #1f2329;
+      --surface: #ffffff;
+      --surface2: #f4f6f8;
+      --surface3: #e9edf2;
+      --border: #e5e8ef;
+      --border-light: #eef1f5;
+      --text: #1f2329;
+      --muted: #6b7280;
+      --primary: #1677ff;
+      --primary-dim: #0958d9;
+      --secondary: #4b5563;
+      --accent: #7c3aed;
+      --success: #16a34a;
+      --success-dim: #15803d;
+      --destructive: #dc2626;
+      --warning: #d97706;
+      --info: #0284c7;
+      --pink: #db2777;
       --radius: 8px;
       --radius-sm: 4px;
       --radius-lg: 12px;
+      --shadow: 0 8px 24px rgba(31, 35, 41, 0.08);
     }
 
     /* Legacy aliases */
@@ -92,7 +93,7 @@
     button:disabled { opacity: 0.5; cursor: not-allowed; }
 
     input, textarea, select {
-      background: var(--bg);
+      background: #fff;
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       color: var(--text);
@@ -115,7 +116,7 @@
 
     /* Sidebar */
     .sidebar {
-      width: 260px;
+      width: 248px;
       background: var(--surface);
       border-right: 1px solid var(--border);
       display: flex;
@@ -192,7 +193,7 @@
 
     .list-item:hover { background: var(--surface2); }
     .list-item.active {
-      background: #1c2333;
+      background: #eef6ff;
       border-left: 3px solid var(--blue);
     }
 
@@ -219,12 +220,13 @@
       font-weight: 500;
     }
 
-    .badge-active { background: #1a3d2e; color: var(--green); }
-    .badge-resumed { background: #1a2a4a; color: var(--cyan); }
-    .badge-ended { background: #2d2d2d; color: var(--muted); }
-    .badge-error { background: #3d1a1a; color: var(--red); }
-    .badge-ready { background: #1a3d2e; color: var(--green); }
-    .badge-running { background: #3d2e1a; color: var(--orange); }
+    .badge-active { background: #dcfce7; color: var(--green); }
+    .badge-resumed { background: #e0f2fe; color: var(--cyan); }
+    .badge-ended { background: #f3f4f6; color: var(--muted); }
+    .badge-error, .badge-failed { background: #fee2e2; color: var(--red); }
+    .badge-ready, .badge-completed { background: #dcfce7; color: var(--green); }
+    .badge-running { background: #fef3c7; color: var(--orange); }
+    .badge-chatting, .badge-pending { background: #dbeafe; color: var(--blue); }
 
     /* Main Content */
     .main {
@@ -344,8 +346,8 @@
     }
 
     .message.user {
-      background: #1a2332;
-      border-color: #2a3a4a;
+      background: #eef6ff;
+      border-color: #bfdbfe;
     }
 
     .message.assistant {
@@ -361,7 +363,7 @@
       font-size: 12px;
     }
 
-    .message.user .message-header { background: #1a2a3a; }
+    .message.user .message-header { background: #dbeafe; }
     .message.assistant .message-header { background: var(--surface2); }
 
     .message-role {
@@ -407,8 +409,8 @@
     }
 
     .block-tool_use {
-      background: #1a2332;
-      border: 1px solid #2a3a4a;
+      background: #eef6ff;
+      border: 1px solid #bfdbfe;
       border-radius: var(--radius-sm);
       padding: 10px 12px;
     }
@@ -459,8 +461,8 @@
     .tool-null { color: var(--muted); font-style: italic; }
 
     .block-tool_result {
-      background: #0d1f12;
-      border: 1px solid #1a3d2e;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
       border-radius: var(--radius-sm);
       padding: 8px 12px;
       font-size: 12px;
@@ -536,6 +538,7 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      box-shadow: var(--shadow);
     }
 
     .modal-header {
@@ -610,6 +613,43 @@
     }
 
     .engine-btn.active { background: var(--blue); color: white; border-color: var(--blue); }
+
+    .engine-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .engine-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .engine-card.active {
+      border-color: var(--primary);
+      box-shadow: inset 0 0 0 1px var(--primary);
+    }
+
+    .engine-card-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+    }
+
+    .engine-card code {
+      background: var(--surface2);
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: var(--text);
+      font-size: 11px;
+    }
 
     /* Sessions list */
     .session-info-grid {
@@ -710,11 +750,7 @@
         <div class="form-group">
           <label>执行引擎</label>
           <select v-model="newTask.engine">
-            <option value="claude">Claude</option>
-            <option value="codex">Codex</option>
-            <option value="opencode">OpenCode</option>
-            <option value="hermes">Hermes</option>
-            <option value="openclaw">OpenClaw</option>
+            <option v-for="engine in engines" :key="engine.id" :value="engine.id">{{ engine.name }}</option>
           </select>
         </div>
       </div>
@@ -810,16 +846,11 @@
         </div>
         <div class="engine-selector">
           <label>Engine:</label>
-          <button class="engine-btn" :class="{active: currentTask.engine === 'claude'}"
-                  @click="currentTask.engine = 'claude'">Claude</button>
-          <button class="engine-btn" :class="{active: currentTask.engine === 'codex'}"
-                  @click="currentTask.engine = 'codex'">Codex</button>
-          <button class="engine-btn" :class="{active: currentTask.engine === 'opencode'}"
-                  @click="currentTask.engine = 'opencode'">OpenCode</button>
-          <button class="engine-btn" :class="{active: currentTask.engine === 'hermes'}"
-                  @click="currentTask.engine = 'hermes'">Hermes</button>
-          <button class="engine-btn" :class="{active: currentTask.engine === 'openclaw'}"
-                  @click="currentTask.engine = 'openclaw'">OpenClaw</button>
+          <button class="engine-btn" v-for="engine in engines" :key="engine.id"
+                  :class="{active: currentTask.engine === engine.id}"
+                  @click="currentTask.engine = engine.id; executeConfig.engine = engine.id">
+            {{ shortEngineName(engine.name) }}
+          </button>
         </div>
       </div>
 
@@ -841,6 +872,9 @@
         <div class="panel-tab" :class="{active: taskTab === 'execute'}" @click="taskTab = 'execute'">
           执行配置
         </div>
+        <div class="panel-tab" :class="{active: taskTab === 'engines'}" @click="taskTab = 'engines'">
+          引擎导入 <span class="tab-count">{{ engines.length }}</span>
+        </div>
       </div>
 
       <div class="main-content">
@@ -850,7 +884,7 @@
             <div class="message" v-for="(msg, i) in currentTask.conversation" :key="i"
                  :class="msg.role">
               <div class="message-header">
-                <span class="message-role">{{ msg.role === 'user' ? 'User' : 'Claude' }}</span>
+                <span class="message-role">{{ msg.role === 'user' ? 'User' : 'CallMyAgent' }}</span>
               </div>
               <div class="message-body">
                 <div class="block-text">{{ msg.content }}</div>
@@ -858,7 +892,7 @@
             </div>
             <div class="message assistant" v-if="loading">
               <div class="message-header">
-                <span class="message-role">Claude</span>
+                <span class="message-role">CallMyAgent</span>
               </div>
               <div class="message-body">
                 <div class="block-text" style="color: var(--muted)">思考中...</div>
@@ -872,6 +906,10 @@
             <div class="execute-config-grid">
               <input v-model="executeConfig.gitRepo" placeholder="Git 仓库 URL">
               <input v-model="executeConfig.gitBranch" placeholder="分支 (默认 main)">
+              <select v-model="executeConfig.schedulerMode">
+                <option value="docker">Docker 本地</option>
+                <option value="job">Kubernetes Job</option>
+              </select>
             </div>
           </div>
         </template>
@@ -897,11 +935,14 @@
             <div class="form-group">
               <label>引擎</label>
               <select v-model="executeConfig.engine">
-                <option value="claude">Claude</option>
-                <option value="codex">Codex</option>
-                <option value="opencode">OpenCode</option>
-                <option value="hermes">Hermes</option>
-                <option value="openclaw">OpenClaw</option>
+                <option v-for="engine in engines" :key="engine.id" :value="engine.id">{{ engine.name }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>调度模式</label>
+              <select v-model="executeConfig.schedulerMode">
+                <option value="docker">Docker 本地</option>
+                <option value="job">Kubernetes Job</option>
               </select>
             </div>
             <div class="form-group">
@@ -913,9 +954,29 @@
               <input v-model.number="executeConfig.budgetUsd" type="number" min="0.01" step="0.1" placeholder="5.00">
             </div>
             <div style="margin-top: 20px">
-              <button class="success" @click="executeTask" :disabled="executing || !executeConfig.gitRepo">
+              <button class="success" @click="executeTask" :disabled="executing || (!executeConfig.gitRepo && executeConfig.schedulerMode !== 'docker')">
                 {{ executing ? '提交中...' : '执行任务' }}
               </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- Engines tab -->
+        <template v-else-if="taskTab === 'engines'">
+          <div class="panel-content">
+            <div class="engine-grid">
+              <div class="engine-card" v-for="engine in engines" :key="engine.id"
+                   :class="{active: executeConfig.engine === engine.id}">
+                <div class="engine-card-title">
+                  <span>{{ engine.name }}</span>
+                  <button class="engine-btn" @click="executeConfig.engine = engine.id; currentTask.engine = engine.id">选择</button>
+                </div>
+                <div class="mono" style="font-size:12px;color:var(--muted)">{{ engine.nonInteractive }}</div>
+                <div style="font-size:12px;color:var(--muted)">
+                  <div v-for="line in engine.install" :key="line"><code>{{ line }}</code></div>
+                </div>
+                <a :href="engine.docsUrl" target="_blank" style="font-size:12px">安装与配置说明</a>
+              </div>
             </div>
           </div>
         </template>
@@ -1081,7 +1142,7 @@
       <div class="welcome">
         <div class="welcome-icon">🤖</div>
         <h2>CallMyAgent</h2>
-        <p>通过 AI 对话规划开发任务，自动执行代码编写。支持 Claude 和 Codex 双引擎。</p>
+        <p>通过 AI 对话规划开发任务，自动执行代码编写。支持 Claude、Codex、OpenCode、Hermes、OpenClaw。</p>
         <button class="primary" @click="showNewTask = true">新建任务</button>
       </div>
     </template>
@@ -1097,6 +1158,13 @@ createApp({
     const view = ref('tasks');
     const tasks = ref([]);
     const sessions = ref([]);
+    const engines = ref([
+      { id: 'claude', name: 'Claude Code' },
+      { id: 'codex', name: 'Codex CLI' },
+      { id: 'opencode', name: 'OpenCode' },
+      { id: 'hermes', name: 'Hermes Agent' },
+      { id: 'openclaw', name: 'OpenClaw' }
+    ]);
     const currentTask = ref(null);
     const currentSession = ref(null);
     const inputMessage = ref('');
@@ -1114,7 +1182,7 @@ createApp({
     const messages = ref([]);
 
     const newTask = ref({ title: '', description: '', gitRepo: '', gitBranch: 'main', engine: 'claude' });
-    const executeConfig = ref({ gitRepo: '', gitBranch: 'main', engine: 'claude', maxTurns: 20, budgetUsd: 5.0 });
+    const executeConfig = ref({ gitRepo: '', gitBranch: 'main', engine: 'claude', schedulerMode: 'docker', maxTurns: 20, budgetUsd: 5.0 });
 
     // Computed
     const transcriptMessages = computed(() => {
@@ -1146,6 +1214,8 @@ createApp({
       completed: '已完成', failed: '失败', pending: '等待中'
     }[s] || s);
 
+    const shortEngineName = (name) => (name || '').replace(' Code', '').replace(' CLI', '').replace(' Agent', '');
+
     const formatTime = (t) => {
       if (!t) return '';
       try { return new Date(t).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
@@ -1164,6 +1234,14 @@ createApp({
         const res = await fetch(API + '/api/tasks');
         tasks.value = (await res.json()) || [];
       } catch (e) { console.error('load tasks:', e); }
+    };
+
+    const loadEngines = async () => {
+      try {
+        const res = await fetch(API + '/api/engines');
+        const data = await res.json();
+        if (Array.isArray(data) && data.length) engines.value = data;
+      } catch (e) { console.error('load engines:', e); }
     };
 
     const loadSessions = async () => {
@@ -1187,7 +1265,10 @@ createApp({
       executeConfig.value = {
         gitRepo: t.gitRepo || '',
         gitBranch: t.gitBranch || 'main',
-        engine: t.engine || 'claude'
+        engine: t.engine || 'claude',
+        schedulerMode: t.schedulerMode || 'docker',
+        maxTurns: t.maxTurns || 20,
+        budgetUsd: t.budgetUsd || 5.0
       };
     };
 
@@ -1285,6 +1366,7 @@ createApp({
           gitRepo: executeConfig.value.gitRepo || currentTask.value.gitRepo,
           gitBranch: executeConfig.value.gitBranch || 'main',
           engine: executeConfig.value.engine || 'claude',
+          schedulerMode: executeConfig.value.schedulerMode || 'docker',
           maxTurns: executeConfig.value.maxTurns || 20,
           budgetUsd: executeConfig.value.budgetUsd || 5.0
         };
@@ -1296,6 +1378,7 @@ createApp({
         const data = await res.json();
         currentTask.value.status = 'running';
         currentTask.value.jobName = data.jobName;
+        currentTask.value.schedulerMode = body.schedulerMode;
       } catch (e) {
         alert('执行失败: ' + e.message);
       }
@@ -1317,6 +1400,7 @@ createApp({
     };
 
     onMounted(() => {
+      loadEngines();
       loadTasks();
       loadSessions();
       loadStats();
@@ -1325,11 +1409,11 @@ createApp({
 
     return {
       view, tasks, sessions, currentTask, currentSession,
-      inputMessage, loading, executing, showNewTask, taskTab, sessionTab, stats,
+      inputMessage, loading, executing, showNewTask, taskTab, sessionTab, stats, engines,
       transcript, events, tools, messages,
       transcriptMessages, transcriptMessageCount, transcriptUserCount, transcriptAssistantCount, transcriptToolCount,
       newTask, executeConfig,
-      statusText, formatTime, formatTimeShort,
+      statusText, formatTime, formatTimeShort, shortEngineName,
       selectTask, selectSession, createTask, sendMessage, executeTask
     };
   }

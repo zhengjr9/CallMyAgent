@@ -159,11 +159,11 @@ func (s *Store) GetStats() map[string]interface{} {
 		}
 	}
 	return map[string]interface{}{
-		"total_sessions":  len(s.sessions),
-		"active_sessions": active,
-		"total_events":    len(s.events),
-		"total_messages":  len(s.messages),
-		"total_tools":     len(s.tools),
+		"total_sessions":    len(s.sessions),
+		"active_sessions":   active,
+		"total_events":      len(s.events),
+		"total_messages":    len(s.messages),
+		"total_tools":       len(s.tools),
 		"total_transcripts": len(s.transcripts),
 	}
 }

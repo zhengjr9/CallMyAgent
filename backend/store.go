@@ -29,7 +29,7 @@ func (s *TaskStore) Create(title, description, gitRepo, gitBranch, engine string
 	t := &Task{
 		ID:          fmt.Sprintf("task-%d", s.seq),
 		Title:       title,
-		Description:  description,
+		Description: description,
 		GitRepo:     gitRepo,
 		GitBranch:   gitBranch,
 		Engine:      engine,
