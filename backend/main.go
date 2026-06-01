@@ -43,6 +43,7 @@ func main() {
 	mux.HandleFunc("/api/tasks", handler.handleTasks)
 	mux.HandleFunc("/api/tasks/", handler.handleTaskByID)
 	mux.HandleFunc("/api/tasks/chat", handler.handleChat)
+	mux.HandleFunc("/api/tasks/chat/stream", handler.handleChatStream)
 	mux.HandleFunc("/api/tasks/execute", handler.handleExecute)
 	mux.HandleFunc("/api/engines", handler.handleEngines)
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {

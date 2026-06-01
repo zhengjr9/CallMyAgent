@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const metaSystemPrompt = `You are a development task planning assistant. Your job is to help the user refine their development requirements through conversation, then produce a complete, detailed prompt that will be given to Claude Code to execute the actual development work.
@@ -95,4 +97,109 @@ func CallClaudeAPI(cfg *Config, messages []Message) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no text content in response")
+}
+
+func CallClaudeAPIStream(cfg *Config, messages []Message, onDelta func(string) error) (string, error) {
+	baseURL := cfg.AnthropicBaseURL
+	if cfg.ClaudeBaseURL != "" {
+		baseURL = cfg.ClaudeBaseURL
+	}
+
+	model := cfg.Model
+	if model == "" {
+		model = "claude-sonnet-4-5-20250514"
+	}
+
+	reqBody := AnthropicRequest{
+		Model:     model,
+		MaxTokens: 4096,
+		System:    metaSystemPrompt,
+		Messages:  messages,
+		Stream:    true,
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequest("POST", baseURL+"/v1/messages", bytes.NewReader(bodyBytes))
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "text/event-stream")
+	httpReq.Header.Set("anthropic-version", "2023-06-01")
+	if cfg.AnthropicAPIKey != "" {
+		httpReq.Header.Set("x-api-key", cfg.AnthropicAPIKey)
+	}
+	if cfg.ClaudeAPIToken != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+cfg.ClaudeAPIToken)
+	}
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var full strings.Builder
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" || data == "[DONE]" {
+			continue
+		}
+
+		var evt struct {
+			Type  string `json:"type"`
+			Delta struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"delta"`
+			ContentBlock struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content_block"`
+			Error *struct {
+				Type    string `json:"type"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal([]byte(data), &evt); err != nil {
+			continue
+		}
+		if evt.Error != nil {
+			return full.String(), fmt.Errorf("%s: %s", evt.Error.Type, evt.Error.Message)
+		}
+
+		text := evt.Delta.Text
+		if text == "" {
+			text = evt.ContentBlock.Text
+		}
+		if text == "" {
+			continue
+		}
+		full.WriteString(text)
+		if err := onDelta(text); err != nil {
+			return full.String(), err
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return full.String(), fmt.Errorf("read stream: %w", err)
+	}
+	if full.Len() == 0 {
+		return "", fmt.Errorf("empty response content")
+	}
+	return full.String(), nil
 }

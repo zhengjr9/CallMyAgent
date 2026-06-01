@@ -98,6 +98,7 @@ type AnthropicRequest struct {
 	MaxTokens int       `json:"max_tokens"`
 	System    string    `json:"system,omitempty"`
 	Messages  []Message `json:"messages"`
+	Stream    bool      `json:"stream,omitempty"`
 }
 
 type AnthropicResponse struct {

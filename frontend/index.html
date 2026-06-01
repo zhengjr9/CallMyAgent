@@ -390,6 +390,75 @@
       word-break: break-word;
     }
 
+    .markdown {
+      font-size: 14px;
+      line-height: 1.75;
+      word-break: break-word;
+    }
+
+    .markdown p { margin: 0 0 10px; }
+    .markdown p:last-child { margin-bottom: 0; }
+    .markdown h1, .markdown h2, .markdown h3 {
+      margin: 14px 0 8px;
+      line-height: 1.35;
+      color: var(--text);
+    }
+    .markdown h1 { font-size: 20px; }
+    .markdown h2 { font-size: 17px; }
+    .markdown h3 { font-size: 15px; }
+    .markdown ul, .markdown ol { margin: 8px 0 12px 22px; padding: 0; }
+    .markdown li { margin: 4px 0; }
+    .markdown code {
+      background: var(--surface2);
+      border: 1px solid var(--border-light);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .markdown pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 10px 0;
+    }
+    .markdown pre code {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      padding: 0;
+    }
+    .markdown blockquote {
+      margin: 10px 0;
+      padding: 8px 12px;
+      border-left: 3px solid var(--blue);
+      background: var(--surface2);
+      color: var(--muted);
+    }
+
+    .typing-dots {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      color: var(--muted);
+    }
+    .typing-dots span {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--muted);
+      animation: typingPulse 1.2s infinite ease-in-out;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: .15s; }
+    .typing-dots span:nth-child(3) { animation-delay: .3s; }
+    @keyframes typingPulse {
+      0%, 80%, 100% { opacity: .35; transform: translateY(0); }
+      40% { opacity: 1; transform: translateY(-3px); }
+    }
+
     .block-thinking {
       background: var(--surface2);
       border: 1px solid var(--border-light);
@@ -887,7 +956,7 @@
                 <span class="message-role">{{ msg.role === 'user' ? 'User' : 'CallMyAgent' }}</span>
               </div>
               <div class="message-body">
-                <div class="block-text">{{ msg.content }}</div>
+                <div class="markdown" v-html="renderMarkdown(msg.content)"></div>
               </div>
             </div>
             <div class="message assistant" v-if="loading">
@@ -895,7 +964,8 @@
                 <span class="message-role">CallMyAgent</span>
               </div>
               <div class="message-body">
-                <div class="block-text" style="color: var(--muted)">思考中...</div>
+                <div class="typing-dots" v-if="!streamingText"><span></span><span></span><span></span> 正在生成</div>
+                <div class="markdown" v-else v-html="renderMarkdown(streamingText)"></div>
               </div>
             </div>
           </div>
@@ -917,7 +987,7 @@
         <!-- Prompt tab -->
         <template v-else-if="taskTab === 'prompt'">
           <div class="panel-content">
-            <pre class="block-text" style="white-space: pre-wrap; font-size: 13px; line-height: 1.6">{{ currentTask.finalPrompt }}</pre>
+            <div class="markdown" v-html="renderMarkdown(currentTask.finalPrompt)"></div>
           </div>
         </template>
 
@@ -1167,9 +1237,11 @@ createApp({
     ]);
     const currentTask = ref(null);
     const currentSession = ref(null);
+    const chatMessages = ref(null);
     const inputMessage = ref('');
     const loading = ref(false);
     const executing = ref(false);
+    const streamingText = ref('');
     const showNewTask = ref(false);
     const taskTab = ref('chat');
     const sessionTab = ref('messages');
@@ -1226,6 +1298,89 @@ createApp({
       if (!t) return '';
       try { return new Date(t).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
       catch { return t; }
+    };
+
+    const escapeHtml = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const renderInlineMarkdown = (value) => escapeHtml(value)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    const renderMarkdown = (value) => {
+      const text = String(value ?? '');
+      const parts = text.split(/(```[\s\S]*?```)/g);
+      return parts.map(part => {
+        if (part.startsWith('```')) {
+          const code = part.replace(/^```[^\n]*\n?/, '').replace(/```$/, '');
+          return `<pre><code>${escapeHtml(code)}</code></pre>`;
+        }
+        const lines = part.split(/\r?\n/);
+        const html = [];
+        let list = null;
+        let paragraph = [];
+        const flushParagraph = () => {
+          if (!paragraph.length) return;
+          html.push(`<p>${renderInlineMarkdown(paragraph.join(' '))}</p>`);
+          paragraph = [];
+        };
+        const closeList = () => {
+          if (!list) return;
+          html.push(`</${list}>`);
+          list = null;
+        };
+        for (const line of lines) {
+          if (!line.trim()) {
+            flushParagraph();
+            closeList();
+            continue;
+          }
+          const heading = line.match(/^(#{1,3})\s+(.+)$/);
+          if (heading) {
+            flushParagraph();
+            closeList();
+            const level = heading[1].length;
+            html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+            continue;
+          }
+          const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+          const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
+          if (bullet || ordered) {
+            flushParagraph();
+            const tag = bullet ? 'ul' : 'ol';
+            if (list !== tag) {
+              closeList();
+              html.push(`<${tag}>`);
+              list = tag;
+            }
+            html.push(`<li>${renderInlineMarkdown((bullet || ordered)[1])}</li>`);
+            continue;
+          }
+          const quote = line.match(/^>\s?(.+)$/);
+          if (quote) {
+            flushParagraph();
+            closeList();
+            html.push(`<blockquote>${renderInlineMarkdown(quote[1])}</blockquote>`);
+            continue;
+          }
+          closeList();
+          paragraph.push(line.trim());
+        }
+        flushParagraph();
+        closeList();
+        return html.join('');
+      }).join('');
+    };
+
+    const scrollChatToBottom = () => {
+      requestAnimationFrame(() => {
+        if (chatMessages.value) chatMessages.value.scrollTop = chatMessages.value.scrollHeight;
+      });
     };
 
     // Load data
@@ -1328,33 +1483,80 @@ createApp({
       const msg = inputMessage.value.trim();
       inputMessage.value = '';
       loading.value = true;
+      streamingText.value = '';
 
-      // Optimistic UI
       if (!currentTask.value.conversation) currentTask.value.conversation = [];
       currentTask.value.conversation.push({ role: 'user', content: msg });
+      scrollChatToBottom();
 
       try {
-        const res = await fetch(API + '/api/tasks/chat', {
+        const res = await fetch(API + '/api/tasks/chat/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ taskId: currentTask.value.id, message: msg })
         });
-        const data = await res.json();
-        if (data.reply) {
-          currentTask.value.conversation.push({ role: 'assistant', content: data.reply });
-          if (data.isFinal) {
-            currentTask.value.status = 'ready';
-            // Refresh to get final prompt
-            const taskRes = await fetch(API + '/api/tasks/' + currentTask.value.id);
-            const updated = await taskRes.json();
-            currentTask.value.finalPrompt = updated.finalPrompt;
+        if (!res.ok || !res.body) {
+          const text = await res.text();
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalData = null;
+        let errorMessage = '';
+
+        const handleEvent = (raw) => {
+          const lines = raw.split(/\r?\n/);
+          let event = 'message';
+          let data = '';
+          for (const line of lines) {
+            if (line.startsWith('event:')) event = line.slice(6).trim();
+            if (line.startsWith('data:')) data += line.slice(5).trim();
           }
+          if (!data) return;
+          const payload = JSON.parse(data);
+          if (event === 'delta') {
+            streamingText.value += payload.text || '';
+            scrollChatToBottom();
+          } else if (event === 'done') {
+            finalData = payload;
+          } else if (event === 'error') {
+            errorMessage = payload.error || '请求失败';
+          }
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
+          events.forEach(handleEvent);
+        }
+        if (buffer.trim()) handleEvent(buffer);
+        if (errorMessage) throw new Error(errorMessage);
+
+        const reply = finalData?.reply || streamingText.value;
+        if (reply) {
+          currentTask.value.conversation.push({ role: 'assistant', content: reply });
+          streamingText.value = '';
+          if (finalData?.isFinal) currentTask.value.status = 'ready';
+          const taskRes = await fetch(API + '/api/tasks/' + currentTask.value.id);
+          if (taskRes.ok) {
+            const updated = await taskRes.json();
+            currentTask.value = { ...currentTask.value, ...updated };
+          }
+          scrollChatToBottom();
         }
       } catch (e) {
         console.error('chat error:', e);
+        streamingText.value = '';
         currentTask.value.conversation.push({ role: 'assistant', content: '请求失败: ' + e.message });
+      } finally {
+        loading.value = false;
+        streamingText.value = '';
       }
-      loading.value = false;
     };
 
     const executeTask = async () => {
@@ -1375,14 +1577,16 @@ createApp({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         });
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
         const data = await res.json();
         currentTask.value.status = 'running';
         currentTask.value.jobName = data.jobName;
         currentTask.value.schedulerMode = body.schedulerMode;
       } catch (e) {
         alert('执行失败: ' + e.message);
+      } finally {
+        executing.value = false;
       }
-      executing.value = false;
     };
 
     // Poll
@@ -1409,11 +1613,12 @@ createApp({
 
     return {
       view, tasks, sessions, currentTask, currentSession,
-      inputMessage, loading, executing, showNewTask, taskTab, sessionTab, stats, engines,
+      inputMessage, loading, executing, streamingText, showNewTask, taskTab, sessionTab, stats, engines,
+      chatMessages,
       transcript, events, tools, messages,
       transcriptMessages, transcriptMessageCount, transcriptUserCount, transcriptAssistantCount, transcriptToolCount,
       newTask, executeConfig,
-      statusText, formatTime, formatTimeShort, shortEngineName,
+      statusText, formatTime, formatTimeShort, shortEngineName, renderMarkdown,
       selectTask, selectSession, createTask, sendMessage, executeTask
     };
   }

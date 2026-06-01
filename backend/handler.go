@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -139,6 +140,96 @@ func (h *Handler) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *Handler) handleChatStream(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ChatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	task := h.store.Get(req.TaskID)
+	if task == nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	if strings.TrimSpace(req.Message) == "" {
+		http.Error(w, "message is required", http.StatusBadRequest)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	send := func(event string, payload any) error {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+
+	task.Conversation = append(task.Conversation, Message{Role: "user", Content: req.Message})
+	h.store.Update(task)
+	_ = send("start", map[string]string{"taskId": task.ID})
+
+	var reply string
+	var err error
+	metaMode := getEnv("META_AGENT_MODE", "auto")
+	useCLI := os.Getenv("USE_META_CLI") == "true" || metaMode == "cli"
+	if metaMode == "auto" {
+		_, cliErr := exec.LookPath("claude")
+		useCLI = cliErr == nil
+	}
+
+	if useCLI {
+		reply, err = RunMetaAgent(h.cfg, task.Conversation, os.Getenv("CLAUDE_REMOTE_URL"))
+		if err == nil {
+			_ = send("delta", map[string]string{"text": reply})
+		}
+	} else {
+		reply, err = CallClaudeAPIStream(h.cfg, task.Conversation, func(delta string) error {
+			return send("delta", map[string]string{"text": delta})
+		})
+	}
+	if err != nil {
+		log.Printf("Meta stream error: %v", err)
+		task.Conversation = task.Conversation[:len(task.Conversation)-1]
+		h.store.Update(task)
+		_ = send("error", map[string]string{"error": err.Error()})
+		return
+	}
+
+	task.Conversation = append(task.Conversation, Message{Role: "assistant", Content: reply})
+	isFinal := false
+	if strings.Contains(reply, "<final-prompt>") {
+		isFinal = true
+		start := strings.Index(reply, "<final-prompt>")
+		end := strings.Index(reply, "</final-prompt>")
+		if start != -1 && end != -1 {
+			task.FinalPrompt = strings.TrimSpace(reply[start+14 : end])
+			task.Status = "ready"
+		}
+	}
+	h.store.Update(task)
+	_ = send("done", ChatResponse{TaskID: task.ID, Reply: reply, IsFinal: isFinal})
 }
 
 func (h *Handler) handleExecute(w http.ResponseWriter, r *http.Request) {
