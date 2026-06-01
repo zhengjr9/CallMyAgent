@@ -14,8 +14,9 @@ func CreateDockerRun(cfg *Config, task *Task) (string, error) {
 	promptDir := filepath.Join(runDir, "prompt")
 	workDir := filepath.Join(runDir, "workspace")
 	outputDir := filepath.Join(runDir, "output")
+	authDir := filepath.Join(runDir, "auth")
 
-	for _, dir := range []string{promptDir, workDir, outputDir} {
+	for _, dir := range []string{promptDir, workDir, outputDir, authDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return "", fmt.Errorf("create docker run dir: %w", err)
 		}
@@ -30,6 +31,7 @@ func CreateDockerRun(cfg *Config, task *Task) (string, error) {
 		"GIT_REPO=" + task.GitRepo,
 		"GIT_BRANCH=" + task.GitBranch,
 		"TASK_ENGINE=" + task.Engine,
+		"GIT_TERMINAL_PROMPT=0",
 		fmt.Sprintf("MAX_TURNS=%d", maxTurns),
 		fmt.Sprintf("BUDGET_USD=%.2f", budgetUSD),
 	}
@@ -56,12 +58,19 @@ func CreateDockerRun(cfg *Config, task *Task) (string, error) {
 	for _, value := range env {
 		args = append(args, "-e", value)
 	}
+	netrcPath, err := prepareDockerNetrc(task, authDir)
+	if err != nil {
+		return "", err
+	}
 	args = append(args,
 		"-v", promptDir+":/prompt:ro",
 		"-v", workDir+":/workspace",
 		"-v", outputDir+":/output",
-		cfg.ContainerImage,
 	)
+	if netrcPath != "" {
+		args = append(args, "-v", netrcPath+":/home/claude/.netrc:ro")
+	}
+	args = append(args, cfg.ContainerImage)
 
 	_ = exec.Command("docker", "rm", "-f", runName).Run()
 	out, err := exec.Command("docker", args...).CombinedOutput()
@@ -69,6 +78,73 @@ func CreateDockerRun(cfg *Config, task *Task) (string, error) {
 		return "", fmt.Errorf("docker run: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 	return runName, nil
+}
+
+func prepareDockerNetrc(task *Task, authDir string) (string, error) {
+	content, err := taskNetrcContent(task)
+	if err != nil {
+		return "", err
+	}
+	if content != "" {
+		return writeDockerNetrc(authDir, content)
+	}
+	return "", nil
+}
+
+func writeDockerNetrc(authDir, content string) (string, error) {
+	netrcPath := filepath.Join(authDir, ".netrc")
+	if err := os.WriteFile(netrcPath, []byte(strings.TrimSpace(content)+"\n"), 0o600); err != nil {
+		return "", fmt.Errorf("write git .netrc: %w", err)
+	}
+	return netrcPath, nil
+}
+
+func netrcFromToken(repoURL, token string) (string, error) {
+	token = strings.TrimSpace(token)
+	if strings.HasPrefix(token, "machine ") {
+		return token, nil
+	}
+	host := gitHost(repoURL)
+	if host == "" {
+		host = "github.com"
+	}
+	return fmt.Sprintf("machine %s\n  login x-access-token\n  password %s\n", host, token), nil
+}
+
+func taskNetrcContent(task *Task) (string, error) {
+	switch {
+	case strings.TrimSpace(task.GitToken) != "":
+		return netrcFromToken(task.GitRepo, task.GitToken)
+	case task.UseHostNetrc:
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve home for ~/.netrc: %w", err)
+		}
+		content, err := os.ReadFile(filepath.Join(home, ".netrc"))
+		if err != nil {
+			return "", fmt.Errorf("read ~/.netrc: %w", err)
+		}
+		return strings.TrimSpace(string(content)) + "\n", nil
+	default:
+		return "", nil
+	}
+}
+
+func gitHost(repoURL string) string {
+	repoURL = strings.TrimSpace(repoURL)
+	if repoURL == "" {
+		return ""
+	}
+	if strings.HasPrefix(repoURL, "https://") || strings.HasPrefix(repoURL, "http://") {
+		withoutScheme := strings.TrimPrefix(strings.TrimPrefix(repoURL, "https://"), "http://")
+		host := strings.SplitN(withoutScheme, "/", 2)[0]
+		return strings.Split(host, "@")[len(strings.Split(host, "@"))-1]
+	}
+	if strings.Contains(repoURL, "@") && strings.Contains(repoURL, ":") {
+		afterAt := strings.SplitN(repoURL, "@", 2)[1]
+		return strings.SplitN(afterAt, ":", 2)[0]
+	}
+	return ""
 }
 
 func GetDockerRunStatus(containerName string) (string, error) {

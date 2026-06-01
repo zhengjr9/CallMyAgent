@@ -284,6 +284,8 @@ func (h *Handler) handleExecute(w http.ResponseWriter, r *http.Request) {
 	if task.SchedulerMode == "" {
 		task.SchedulerMode = normalizeSchedulerMode(h.cfg.SchedulerMode)
 	}
+	task.GitToken = strings.TrimSpace(req.GitToken)
+	task.UseHostNetrc = req.UseHostNetrc
 
 	if task.GitRepo == "" && task.SchedulerMode != "docker" {
 		http.Error(w, "git repo URL is required", http.StatusBadRequest)

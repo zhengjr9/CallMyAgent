@@ -36,6 +36,8 @@ type Task struct {
 	ErrorMessage  string    `json:"errorMessage,omitempty"`
 	MaxTurns      int       `json:"maxTurns,omitempty"`
 	BudgetUSD     float64   `json:"budgetUsd,omitempty"`
+	GitToken      string    `json:"-"`
+	UseHostNetrc  bool      `json:"useHostNetrc,omitempty"`
 	CreatedAt     string    `json:"createdAt"`
 	UpdatedAt     string    `json:"updatedAt"`
 }
@@ -64,6 +66,8 @@ type ExecuteRequest struct {
 	MaxTurns      int     `json:"maxTurns,omitempty"`
 	BudgetUSD     float64 `json:"budgetUsd,omitempty"`
 	SchedulerMode string  `json:"schedulerMode,omitempty"` // job/k8s, docker
+	GitToken      string  `json:"gitToken,omitempty"`
+	UseHostNetrc  bool    `json:"useHostNetrc,omitempty"`
 }
 
 type ExecuteResponse struct {

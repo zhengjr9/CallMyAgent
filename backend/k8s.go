@@ -75,6 +75,7 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 		{Name: "CALLMYAGENT_TASK_ID", Value: task.ID},
 		{Name: "GIT_REPO", Value: task.GitRepo},
 		{Name: "GIT_BRANCH", Value: task.GitBranch},
+		{Name: "GIT_TERMINAL_PROMPT", Value: "0"},
 		{Name: "TASK_ENGINE", Value: task.Engine},
 	}
 	envVars[0].ValueFrom.SecretKeyRef.Name = "callmyagent-api-secret"
@@ -142,6 +143,46 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 	volumeMounts := []corev1.VolumeMount{
 		{Name: "prompt-volume", MountPath: "/prompt", ReadOnly: true},
 		{Name: "work-volume", MountPath: "/workspace"},
+	}
+
+	if netrcContent, err := taskNetrcContent(task); err != nil {
+		return "", err
+	} else if netrcContent != "" {
+		defaultMode := int32(0o400)
+		secretName := jobName + "-git-netrc"
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: cfg.K8sNamespace,
+				Labels: map[string]string{
+					"app":       "callmyagent",
+					"task-id":   task.ID,
+					"component": "worker",
+				},
+			},
+			Data: map[string][]byte{
+				".netrc": []byte(netrcContent),
+			},
+		}
+		if _, err := clientset.CoreV1().Secrets(cfg.K8sNamespace).Create(
+			context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+			return "", fmt.Errorf("create git netrc secret: %w", err)
+		}
+		volumes = append(volumes, corev1.Volume{
+			Name: "git-netrc",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  secretName,
+					DefaultMode: &defaultMode,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "git-netrc",
+			MountPath: "/home/claude/.netrc",
+			SubPath:   ".netrc",
+			ReadOnly:  true,
+		})
 	}
 
 	// Add PVC if configured

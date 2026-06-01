@@ -104,6 +104,25 @@ export DOCKER_RUNS_DIR=/tmp/callmyagent-runs
 
 The page execution form also sends `schedulerMode`, so a single server can accept either `docker` or `job` per task.
 
+## Git Credentials
+
+The execution page supports private repositories through `.netrc` credentials:
+
+- Paste a Git token in the execution form to generate a runtime-only `.netrc` for the task.
+- Or leave the token empty and enable "Use server ~/.netrc" to copy the task server user's `~/.netrc`.
+
+For Docker mode, CallMyAgent writes the generated `.netrc` under `DOCKER_RUNS_DIR/<task>/auth/.netrc` with `0600` permissions and mounts it read-only to `/home/claude/.netrc`. For Kubernetes Job mode, it creates a task-scoped Secret and mounts the same path. Tokens are not returned by the task API and are not passed as Docker environment variables.
+
+Token-only input uses this generated format:
+
+```text
+machine <repo-host>
+  login x-access-token
+  password <token>
+```
+
+If you need a different login name or multiple hosts, paste a complete `.netrc` body beginning with `machine`.
+
 ## Custom Providers
 
 When `OPENAI_BASE_URL`, `OPENAI_MODEL`, and `OPENAI_API_KEY` are present, the worker creates runtime-only provider configs:

@@ -594,6 +594,22 @@
 
     .form-row { display: flex; gap: 12px; }
     .form-row .form-group { flex: 1; }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .checkbox-row input {
+      width: 16px;
+      height: 16px;
+    }
+    .form-hint {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
 
     /* Modal */
     .modal-overlay {
@@ -1012,6 +1028,15 @@
               <input v-model="executeConfig.gitBranch" placeholder="main">
             </div>
             <div class="form-group">
+              <label>Git Token / .netrc</label>
+              <input v-model="executeConfig.gitToken" type="password" autocomplete="off" placeholder="GitHub/GitLab token，执行时写入容器 ~/.netrc">
+              <label class="checkbox-row">
+                <input type="checkbox" v-model="executeConfig.useHostNetrc" :disabled="!!executeConfig.gitToken">
+                使用服务端 ~/.netrc
+              </label>
+              <div class="form-hint">优先使用上方 token；留空并勾选时会挂载运行服务用户的 ~/.netrc。</div>
+            </div>
+            <div class="form-group">
               <label>引擎</label>
               <select v-model="executeConfig.engine">
                 <option v-for="engine in engines" :key="engine.id" :value="engine.id">{{ engine.name }}</option>
@@ -1263,7 +1288,16 @@ createApp({
     const messages = ref([]);
 
     const newTask = ref({ title: '', description: '', gitRepo: '', gitBranch: 'main', engine: 'claude' });
-    const executeConfig = ref({ gitRepo: '', gitBranch: 'main', engine: 'claude', schedulerMode: 'docker', maxTurns: 20, budgetUsd: 5.0 });
+    const executeConfig = ref({
+      gitRepo: '',
+      gitBranch: 'main',
+      gitToken: '',
+      useHostNetrc: false,
+      engine: 'claude',
+      schedulerMode: 'docker',
+      maxTurns: 20,
+      budgetUsd: 5.0
+    });
 
     // Computed
     const transcriptMessages = computed(() => {
@@ -1429,6 +1463,8 @@ createApp({
       executeConfig.value = {
         gitRepo: t.gitRepo || '',
         gitBranch: t.gitBranch || 'main',
+        gitToken: '',
+        useHostNetrc: false,
         engine: t.engine || 'claude',
         schedulerMode: t.schedulerMode || 'docker',
         maxTurns: t.maxTurns || 20,
@@ -1576,6 +1612,8 @@ createApp({
           taskId: currentTask.value.id,
           gitRepo: executeConfig.value.gitRepo || currentTask.value.gitRepo,
           gitBranch: executeConfig.value.gitBranch || 'main',
+          gitToken: executeConfig.value.gitToken || '',
+          useHostNetrc: !executeConfig.value.gitToken && !!executeConfig.value.useHostNetrc,
           engine: executeConfig.value.engine || 'claude',
           schedulerMode: executeConfig.value.schedulerMode || 'docker',
           maxTurns: executeConfig.value.maxTurns || 20,
