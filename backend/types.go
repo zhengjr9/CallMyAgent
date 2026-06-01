@@ -19,6 +19,7 @@ type Config struct {
 	MaxConversations int
 	OutputPVC        string
 	Model            string
+	RemoteServerURL  string
 }
 
 type Task struct {

@@ -108,7 +108,7 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	// Build HookEvent from raw
 	event := HookEvent{
 		SessionID:      getString(raw, "session_id"),
-		Event:          getString(raw, "hook_event_name"),
+		Event:          firstString(raw, "event", "hook_event_name"),
 		Cwd:            getString(raw, "cwd"),
 		TranscriptPath: getString(raw, "transcript_path"),
 		Raw:            raw,
@@ -119,11 +119,11 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	// If it's a SessionStart with source=compact, trigger resume logic
 	if event.Event == "SessionStart" && getString(raw, "source") == "compact" {
-		log.Printf("[resume] Session %s resumed from compaction", event.SessionID[:12])
+		log.Printf("[resume] Session %s resumed from compaction", shortID(event.SessionID))
 	}
 
 	log.Printf("[event] %s: %s | tool=%s | prompt=%s",
-		event.Event, event.SessionID[:12],
+		event.Event, shortID(event.SessionID),
 		getString(raw, "tool_name"),
 		truncate(getString(raw, "prompt"), 60))
 
@@ -160,7 +160,7 @@ func (h *Handler) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.AddMessage(msg)
-	log.Printf("[message] %s: %s | uuid=%s", msg.Role, truncate(msg.Content, 80), msg.Uuid[:8])
+	log.Printf("[message] %s: %s | uuid=%s", msg.Role, truncate(msg.Content, 80), shortID(msg.Uuid))
 
 	w.WriteHeader(http.StatusAccepted)
 	writeJSON(w, map[string]string{"status": "ok"})
@@ -243,7 +243,7 @@ func (h *Handler) handleTranscripts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[transcript] session=%s messages=%d cwd=%s",
-		transcript.SessionID[:12], transcript.MessageCount, transcript.Cwd)
+		shortID(transcript.SessionID), transcript.MessageCount, transcript.Cwd)
 
 	w.WriteHeader(http.StatusAccepted)
 	writeJSON(w, map[string]string{"status": "ok"})
@@ -308,6 +308,15 @@ func getString(m map[string]interface{}, key string) string {
 	return ""
 }
 
+func firstString(m map[string]interface{}, keys ...string) string {
+	for _, key := range keys {
+		if value := getString(m, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func getBool(m map[string]interface{}, key string) bool {
 	if v, ok := m[key].(bool); ok {
 		return v
@@ -327,4 +336,11 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max] + "..."
+}
+
+func shortID(s string) string {
+	if len(s) <= 12 {
+		return s
+	}
+	return s[:12]
 }

@@ -117,6 +117,12 @@ func CreateClaudeJob(cfg *Config, task *Task) (string, error) {
 			Value: cfg.ClaudeAPIToken,
 		})
 	}
+	if cfg.RemoteServerURL != "" {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "CLAUDE_REMOTE_URL",
+			Value: cfg.RemoteServerURL,
+		})
+	}
 
 	// Volume mounts
 	volumes := []corev1.Volume{

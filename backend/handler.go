@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -17,6 +19,26 @@ type Handler struct {
 
 func NewHandler(cfg *Config, store *TaskStore) *Handler {
 	return &Handler{cfg: cfg, store: store}
+}
+
+func (h *Handler) handleRemoteAPI(w http.ResponseWriter, r *http.Request) {
+	remoteURL := strings.TrimRight(h.cfg.RemoteServerURL, "/")
+	if remoteURL == "" {
+		http.Error(w, "remote server is not configured", http.StatusBadGateway)
+		return
+	}
+	target, err := url.Parse(remoteURL)
+	if err != nil {
+		http.Error(w, "invalid remote server URL", http.StatusBadGateway)
+		return
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		log.Printf("remote proxy error: %v", err)
+		http.Error(w, "remote server unavailable: "+err.Error(), http.StatusBadGateway)
+	}
+	proxy.ServeHTTP(w, r)
 }
 
 func (h *Handler) handleTasks(w http.ResponseWriter, r *http.Request) {

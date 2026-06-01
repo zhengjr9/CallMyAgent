@@ -53,6 +53,9 @@ func CreateDockerRun(cfg *Config, task *Task) (string, error) {
 	if cfg.ClaudeAPIToken != "" {
 		env = append(env, "CLAUDE_API_TOKEN="+cfg.ClaudeAPIToken)
 	}
+	if cfg.RemoteServerURL != "" {
+		env = append(env, "CLAUDE_REMOTE_URL="+dockerReachableRemoteURL(cfg.RemoteServerURL))
+	}
 
 	args := []string{"run", "-d", "--name", runName}
 	for _, value := range env {
@@ -78,6 +81,16 @@ func CreateDockerRun(cfg *Config, task *Task) (string, error) {
 		return "", fmt.Errorf("docker run: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 	return runName, nil
+}
+
+func dockerReachableRemoteURL(remoteURL string) string {
+	remoteURL = strings.TrimSpace(remoteURL)
+	for _, host := range []string{"http://127.0.0.1:", "http://localhost:"} {
+		if strings.HasPrefix(remoteURL, host) {
+			return strings.Replace(remoteURL, host, "http://host.docker.internal:", 1)
+		}
+	}
+	return remoteURL
 }
 
 func prepareDockerNetrc(task *Task, authDir string) (string, error) {

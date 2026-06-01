@@ -32,6 +32,7 @@ func main() {
 		MaxConversations: 5,
 		OutputPVC:        os.Getenv("OUTPUT_PVC"),
 		Model:            os.Getenv("CLAUDE_MODEL"),
+		RemoteServerURL:  getEnv("REMOTE_SERVER_URL", "http://127.0.0.1:9090"),
 	}
 
 	store := NewTaskStore()
@@ -45,6 +46,12 @@ func main() {
 	mux.HandleFunc("/api/tasks/chat", handler.handleChat)
 	mux.HandleFunc("/api/tasks/chat/stream", handler.handleChatStream)
 	mux.HandleFunc("/api/tasks/execute", handler.handleExecute)
+	mux.HandleFunc("/api/sessions", handler.handleRemoteAPI)
+	mux.HandleFunc("/api/sessions/", handler.handleRemoteAPI)
+	mux.HandleFunc("/api/events", handler.handleRemoteAPI)
+	mux.HandleFunc("/api/messages", handler.handleRemoteAPI)
+	mux.HandleFunc("/api/transcripts", handler.handleRemoteAPI)
+	mux.HandleFunc("/api/tools", handler.handleRemoteAPI)
 	mux.HandleFunc("/api/engines", handler.handleEngines)
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
