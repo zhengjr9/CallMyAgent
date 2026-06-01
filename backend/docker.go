@@ -187,3 +187,11 @@ func GetDockerRunStatus(containerName string) (string, error) {
 		return "pending", nil
 	}
 }
+
+func GetDockerRunLogs(containerName string) (string, error) {
+	out, err := exec.Command("docker", "logs", containerName).CombinedOutput()
+	if err != nil {
+		return string(out), fmt.Errorf("docker logs: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return string(out), nil
+}

@@ -136,6 +136,10 @@ func (h *Handler) handleTaskByID(w http.ResponseWriter, r *http.Request) {
 		h.getTaskStatus(w, r, taskID)
 		return
 	}
+	if len(parts) > 1 && parts[1] == "logs" {
+		h.getTaskLogs(w, r, taskID)
+		return
+	}
 
 	switch r.Method {
 	case http.MethodGet:
@@ -471,6 +475,36 @@ func (h *Handler) getTaskStatus(w http.ResponseWriter, r *http.Request, taskID s
 	json.NewEncoder(w).Encode(map[string]string{
 		"taskId": task.ID,
 		"status": task.Status,
+	})
+}
+
+func (h *Handler) getTaskLogs(w http.ResponseWriter, r *http.Request, taskID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	task := h.store.Get(taskID)
+	if task == nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	h.refreshTaskStatus(task)
+	if task.JobName == "" {
+		http.Error(w, "task has no scheduled run", http.StatusBadRequest)
+		return
+	}
+	logs, err := getScheduledRunLogs(h.cfg, task)
+	if err != nil {
+		http.Error(w, "failed to get logs: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"taskId":        task.ID,
+		"jobName":       task.JobName,
+		"schedulerMode": task.SchedulerMode,
+		"status":        task.Status,
+		"logs":          logs,
 	})
 }
 

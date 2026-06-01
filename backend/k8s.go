@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -300,4 +301,13 @@ func GetJobStatus(cfg *Config, jobName string) (string, error) {
 		return "running", nil
 	}
 	return "pending", nil
+}
+
+func GetJobLogs(cfg *Config, jobName string) (string, error) {
+	args := []string{"logs", "job/" + jobName, "-n", cfg.K8sNamespace, "--all-containers=true"}
+	out, err := exec.Command("kubectl", args...).CombinedOutput()
+	if err != nil {
+		return string(out), fmt.Errorf("kubectl logs: %w: %s", err, string(out))
+	}
+	return string(out), nil
 }

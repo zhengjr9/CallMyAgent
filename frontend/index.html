@@ -448,6 +448,28 @@
       color: var(--muted);
     }
 
+    .logs-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .log-viewer {
+      background: #0f172a;
+      color: #dbeafe;
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      min-height: 360px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
     .typing-dots {
       display: inline-flex;
       gap: 4px;
@@ -966,6 +988,9 @@
         <div class="panel-tab" :class="{active: taskTab === 'execute'}" @click="taskTab = 'execute'">
           执行配置
         </div>
+        <div class="panel-tab" :class="{active: taskTab === 'logs'}" @click="taskTab = 'logs'; loadTaskLogs()">
+          执行日志
+        </div>
         <div class="panel-tab" :class="{active: taskTab === 'engines'}" @click="taskTab = 'engines'">
           引擎导入 <span class="tab-count">{{ engines.length }}</span>
         </div>
@@ -1062,6 +1087,21 @@
                 {{ executing ? '提交中...' : '执行任务' }}
               </button>
             </div>
+          </div>
+        </template>
+
+        <!-- Logs tab -->
+        <template v-else-if="taskTab === 'logs'">
+          <div class="panel-content">
+            <div class="logs-toolbar">
+              <div class="form-hint">
+                {{ currentTask.schedulerMode === 'job' ? 'kubectl logs job/' : 'docker logs ' }}{{ currentTask.jobName || '未开始执行' }}
+              </div>
+              <button class="secondary" @click="loadTaskLogs" :disabled="logsLoading || !currentTask.jobName">
+                {{ logsLoading ? '刷新中...' : '刷新日志' }}
+              </button>
+            </div>
+            <pre class="log-viewer">{{ taskLogs || (currentTask.jobName ? '暂无日志' : '执行后会在这里显示标准输出和标准错误') }}</pre>
           </div>
         </template>
 
@@ -1276,6 +1316,8 @@ createApp({
     const inputMessage = ref('');
     const loading = ref(false);
     const executing = ref(false);
+    const logsLoading = ref(false);
+    const taskLogs = ref('');
     const streamingText = ref('');
     const showNewTask = ref(false);
     const taskTab = ref('chat');
@@ -1461,6 +1503,7 @@ createApp({
     const selectTask = async (t) => {
       currentTask.value = { ...t };
       taskTab.value = 'chat';
+      taskLogs.value = '';
       executeConfig.value = {
         gitRepo: t.gitRepo || '',
         gitBranch: t.gitBranch || 'main',
@@ -1522,6 +1565,25 @@ createApp({
         selectTask(task);
       } catch (e) {
         alert('恢复失败: ' + e.message);
+      }
+    };
+
+    const loadTaskLogs = async () => {
+      if (!currentTask.value?.id || !currentTask.value?.jobName) {
+        taskLogs.value = '';
+        return;
+      }
+      logsLoading.value = true;
+      try {
+        const res = await fetch(API + '/api/tasks/' + currentTask.value.id + '/logs');
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+        const data = await res.json();
+        taskLogs.value = data.logs || '';
+        currentTask.value.status = data.status || currentTask.value.status;
+      } catch (e) {
+        taskLogs.value = '日志读取失败: ' + e.message;
+      } finally {
+        logsLoading.value = false;
       }
     };
 
@@ -1652,6 +1714,9 @@ createApp({
         currentTask.value.status = 'running';
         currentTask.value.jobName = data.jobName;
         currentTask.value.schedulerMode = body.schedulerMode;
+        taskTab.value = 'logs';
+        taskLogs.value = '';
+        await loadTaskLogs();
       } catch (e) {
         alert('执行失败: ' + e.message);
       } finally {
@@ -1666,7 +1731,10 @@ createApp({
       if (currentTask.value?.status === 'running') {
         await loadTasks();
         const t = tasks.value.find(t => t.id === currentTask.value.id);
-        if (t) currentTask.value.status = t.status;
+        if (t) currentTask.value = { ...currentTask.value, ...t };
+      }
+      if (currentTask.value?.jobName && (taskTab.value === 'logs' || currentTask.value.status === 'running')) {
+        await loadTaskLogs();
       }
       if (currentSession.value) {
         await loadSessionData(currentSession.value.session_id);
@@ -1683,13 +1751,13 @@ createApp({
 
     return {
       view, tasks, sessions, currentTask, currentSession,
-      inputMessage, loading, executing, streamingText, showNewTask, taskTab, sessionTab, stats, engines,
+      inputMessage, loading, executing, logsLoading, taskLogs, streamingText, showNewTask, taskTab, sessionTab, stats, engines,
       chatMessages,
       transcript, events, tools, messages,
       transcriptMessages, transcriptMessageCount, transcriptUserCount, transcriptAssistantCount, transcriptToolCount,
       newTask, executeConfig,
       statusText, formatTime, formatTimeShort, shortEngineName, renderMarkdown,
-      selectTask, selectSession, createTask, resumeSessionAsTask, sendMessage, executeTask
+      selectTask, selectSession, createTask, resumeSessionAsTask, sendMessage, executeTask, loadTaskLogs
     };
   }
 }).mount('#app');

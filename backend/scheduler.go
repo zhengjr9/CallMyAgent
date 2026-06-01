@@ -70,3 +70,12 @@ func getScheduledRunStatus(cfg *Config, task *Task) (string, error) {
 		return GetJobStatus(cfg, task.JobName)
 	}
 }
+
+func getScheduledRunLogs(cfg *Config, task *Task) (string, error) {
+	switch normalizeSchedulerMode(task.SchedulerMode) {
+	case "docker":
+		return GetDockerRunLogs(task.JobName)
+	default:
+		return GetJobLogs(cfg, task.JobName)
+	}
+}
