@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -39,6 +40,75 @@ func (h *Handler) handleRemoteAPI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "remote server unavailable: "+err.Error(), http.StatusBadGateway)
 	}
 	proxy.ServeHTTP(w, r)
+}
+
+func (h *Handler) handleResumeSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ResumeSessionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	req.SessionID = strings.TrimSpace(req.SessionID)
+	if req.SessionID == "" {
+		http.Error(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+	engine := strings.TrimSpace(req.Engine)
+	if engine == "" {
+		engine = "claude"
+	}
+	if !IsSupportedEngine(engine) {
+		http.Error(w, "unsupported engine: "+engine, http.StatusBadRequest)
+		return
+	}
+
+	remoteURL := strings.TrimRight(h.cfg.RemoteServerURL, "/")
+	resp, err := http.Get(remoteURL + "/api/sessions/" + url.PathEscape(req.SessionID) + "/conversation?target=callmyagent")
+	if err != nil {
+		http.Error(w, "load session conversation: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		http.Error(w, "load session conversation: "+strings.TrimSpace(string(body)), http.StatusBadGateway)
+		return
+	}
+
+	var export SessionConversationExport
+	if err := json.NewDecoder(resp.Body).Decode(&export); err != nil {
+		http.Error(w, "decode session conversation: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	if len(export.Messages) == 0 {
+		http.Error(w, "session has no messages to resume", http.StatusBadRequest)
+		return
+	}
+
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		title = "Resume " + req.SessionID
+	}
+	task := h.store.Create(title, "", "", "main", engine)
+	task.Conversation = sanitizeConversation(export.Messages)
+	if req.Message != "" {
+		task.Conversation = append(task.Conversation, Message{Role: "user", Content: req.Message})
+	}
+	if finalPrompt, ok := extractFinalPromptFromMessages(task.Conversation); ok {
+		task.FinalPrompt = finalPrompt
+		task.Status = "ready"
+	} else {
+		task.Status = "chatting"
+	}
+	h.store.Update(task)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(task)
 }
 
 func (h *Handler) handleTasks(w http.ResponseWriter, r *http.Request) {
@@ -142,14 +212,10 @@ func (h *Handler) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	// Check if this is the final prompt
 	isFinal := false
-	if strings.Contains(reply, "<final-prompt>") {
+	if finalPrompt, ok := extractFinalPrompt(reply); ok {
 		isFinal = true
-		start := strings.Index(reply, "<final-prompt>")
-		end := strings.Index(reply, "</final-prompt>")
-		if start != -1 && end != -1 {
-			task.FinalPrompt = reply[start+14 : end]
-			task.Status = "ready"
-		}
+		task.FinalPrompt = finalPrompt
+		task.Status = "ready"
 	}
 
 	h.store.Update(task)
@@ -241,14 +307,10 @@ func (h *Handler) handleChatStream(w http.ResponseWriter, r *http.Request) {
 
 	task.Conversation = append(task.Conversation, Message{Role: "assistant", Content: reply})
 	isFinal := false
-	if strings.Contains(reply, "<final-prompt>") {
+	if finalPrompt, ok := extractFinalPrompt(reply); ok {
 		isFinal = true
-		start := strings.Index(reply, "<final-prompt>")
-		end := strings.Index(reply, "</final-prompt>")
-		if start != -1 && end != -1 {
-			task.FinalPrompt = strings.TrimSpace(reply[start+14 : end])
-			task.Status = "ready"
-		}
+		task.FinalPrompt = finalPrompt
+		task.Status = "ready"
 	}
 	h.store.Update(task)
 	_ = send("done", ChatResponse{TaskID: task.ID, Reply: reply, IsFinal: isFinal})
@@ -386,6 +448,7 @@ func (h *Handler) getTask(w http.ResponseWriter, r *http.Request, taskID string)
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
+	h.refreshTaskStatus(task)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(task)
 }
@@ -420,4 +483,40 @@ func (h *Handler) refreshTaskStatus(task *Task) {
 		task.Status = status
 		h.store.Update(task)
 	}
+}
+
+func sanitizeConversation(messages []Message) []Message {
+	result := make([]Message, 0, len(messages))
+	for _, msg := range messages {
+		role := strings.ToLower(strings.TrimSpace(msg.Role))
+		switch role {
+		case "user", "assistant", "system":
+		default:
+			role = "assistant"
+		}
+		content := strings.TrimSpace(msg.Content)
+		if content == "" {
+			continue
+		}
+		result = append(result, Message{Role: role, Content: content})
+	}
+	return result
+}
+
+func extractFinalPromptFromMessages(messages []Message) (string, bool) {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if prompt, ok := extractFinalPrompt(messages[i].Content); ok {
+			return prompt, true
+		}
+	}
+	return "", false
+}
+
+func extractFinalPrompt(content string) (string, bool) {
+	start := strings.Index(content, "<final-prompt>")
+	end := strings.Index(content, "</final-prompt>")
+	if start == -1 || end == -1 || end <= start {
+		return "", false
+	}
+	return strings.TrimSpace(content[start+len("<final-prompt>") : end]), true
 }

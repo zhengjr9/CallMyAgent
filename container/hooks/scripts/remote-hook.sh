@@ -12,7 +12,7 @@
 set -euo pipefail
 
 # ── Configuration ──────────────────────────────────
-REMOTE_URL="${CLAUDE_REMOTE_URL:-http://localhost:9090}"
+REMOTE_URL="${1:-${CLAUDE_REMOTE_URL:-http://localhost:9090}}"
 API_TOKEN="${CLAUDE_REMOTE_TOKEN:-}"
 
 # ── Read hook input ────────────────────────────────

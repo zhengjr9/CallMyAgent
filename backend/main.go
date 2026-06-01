@@ -46,6 +46,7 @@ func main() {
 	mux.HandleFunc("/api/tasks/chat", handler.handleChat)
 	mux.HandleFunc("/api/tasks/chat/stream", handler.handleChatStream)
 	mux.HandleFunc("/api/tasks/execute", handler.handleExecute)
+	mux.HandleFunc("/api/tasks/resume-session", handler.handleResumeSession)
 	mux.HandleFunc("/api/sessions", handler.handleRemoteAPI)
 	mux.HandleFunc("/api/sessions/", handler.handleRemoteAPI)
 	mux.HandleFunc("/api/events", handler.handleRemoteAPI)

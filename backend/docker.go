@@ -16,6 +16,9 @@ func CreateDockerRun(cfg *Config, task *Task) (string, error) {
 	outputDir := filepath.Join(runDir, "output")
 	authDir := filepath.Join(runDir, "auth")
 
+	if err := os.RemoveAll(runDir); err != nil {
+		return "", fmt.Errorf("clean docker run dir: %w", err)
+	}
 	for _, dir := range []string{promptDir, workDir, outputDir, authDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return "", fmt.Errorf("create docker run dir: %w", err)

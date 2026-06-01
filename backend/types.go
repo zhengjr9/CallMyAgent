@@ -77,6 +77,19 @@ type ExecuteResponse struct {
 	Status  string `json:"status"`
 }
 
+type ResumeSessionRequest struct {
+	SessionID string `json:"sessionId"`
+	Engine    string `json:"engine,omitempty"`
+	Title     string `json:"title,omitempty"`
+	Message   string `json:"message,omitempty"`
+}
+
+type SessionConversationExport struct {
+	SessionID string    `json:"session_id"`
+	Target    string    `json:"target"`
+	Messages  []Message `json:"messages"`
+}
+
 type CreateTaskRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`

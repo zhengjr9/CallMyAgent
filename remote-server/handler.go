@@ -76,6 +76,14 @@ func (h *Handler) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 			tools := h.store.GetToolUsage(sessionID)
 			writeJSON(w, tools)
 			return
+		case "conversation":
+			target := r.URL.Query().Get("target")
+			export := BuildConversation(h.store.GetTranscript(sessionID), h.store.GetMessages(sessionID), target)
+			if export.SessionID == "" {
+				export.SessionID = sessionID
+			}
+			writeJSON(w, export)
+			return
 		}
 	}
 

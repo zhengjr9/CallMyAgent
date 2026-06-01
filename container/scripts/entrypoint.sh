@@ -73,6 +73,73 @@ json_escape() {
     printf '%s' "${1:-}" | jq -Rsa .
 }
 
+post_remote() {
+    local endpoint="$1"
+    local payload="$2"
+    if [ -z "${CLAUDE_REMOTE_URL:-}" ]; then
+        return 0
+    fi
+    curl -sf --max-time 10 \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        "${CLAUDE_REMOTE_URL}${endpoint}" >/dev/null 2>&1 || true
+}
+
+push_codex_session() {
+    if [ -z "${CLAUDE_REMOTE_URL:-}" ] || [ ! -f /workspace/codex-result.jsonl ]; then
+        return 0
+    fi
+
+    local sid started assistant_text transcript_payload session_payload
+    sid="codex-${TASK_ID}-$(date +%s)"
+    started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    assistant_text="$(jq -r '
+      [
+        .message,
+        .content,
+        .text,
+        .delta,
+        .output_text,
+        .item.text,
+        .item.aggregated_output,
+        (.item.content[]?.text?),
+        (.response.output[]?.content[]?.text?)
+      ] | map(select(type == "string" and length > 0)) | join("\n")
+    ' /workspace/codex-result.jsonl 2>/dev/null | awk 'NF { print }' | tail -200)"
+    if [ -z "$assistant_text" ]; then
+        assistant_text="$(tail -200 /workspace/codex-result.jsonl)"
+    fi
+
+    session_payload="$(jq -n \
+        --arg sid "$sid" \
+        --arg cwd "$PWD" \
+        --arg model "${CODEX_MODEL:-${OPENAI_MODEL:-}}" \
+        --arg started "$started" \
+        '{session_id:$sid,cwd:$cwd,model:$model,source:"codex",status:"active",started_at:$started}')"
+    post_remote "/api/sessions" "$session_payload"
+
+    transcript_payload="$(jq -n \
+        --arg sid "$sid" \
+        --arg cwd "$PWD" \
+        --arg prompt "$PROMPT" \
+        --arg answer "$assistant_text" \
+        --arg ts "$started" \
+        '{
+          session_id:$sid,
+          cwd:$cwd,
+          messages:[
+            {role:"user", content:[{type:"text", text:$prompt}], timestamp:$ts},
+            {role:"assistant", content:[{type:"text", text:$answer}], timestamp:(now|strftime("%Y-%m-%dT%H:%M:%SZ"))}
+          ],
+          message_count:2,
+          timestamp:(now|strftime("%Y-%m-%dT%H:%M:%SZ"))
+        }')"
+    post_remote "/api/transcripts" "$transcript_payload"
+    post_remote "/api/messages" "$(jq -n --arg sid "$sid" --arg ct "$PROMPT" '{session_id:$sid,role:"user",content:$ct,timestamp:(now|strftime("%Y-%m-%dT%H:%M:%SZ"))}')"
+    post_remote "/api/messages" "$(jq -n --arg sid "$sid" --arg ct "$assistant_text" '{session_id:$sid,role:"assistant",content:$ct,timestamp:(now|strftime("%Y-%m-%dT%H:%M:%SZ"))}')"
+    post_remote "/api/sessions" "$(jq -n --arg sid "$sid" '{session_id:$sid,status:"ended",ended_at:(now|strftime("%Y-%m-%dT%H:%M:%SZ"))}')"
+}
+
 write_opencode_config() {
     if [ -z "${OPENAI_COMPAT_BASE_URL:-}" ] || [ -z "${OPENAI_API_KEY:-}" ]; then
         return
@@ -292,6 +359,7 @@ case "$ENGINE" in
     if [ -f /workspace/codex-result.jsonl ]; then
         echo "Result saved to /workspace/codex-result.jsonl ($(wc -l < /workspace/codex-result.jsonl) lines)"
     fi
+    push_codex_session
     ;;
 
   opencode)

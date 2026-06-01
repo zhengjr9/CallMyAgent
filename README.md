@@ -104,6 +104,19 @@ export DOCKER_RUNS_DIR=/tmp/callmyagent-runs
 
 The page execution form also sends `schedulerMode`, so a single server can accept either `docker` or `job` per task.
 
+## Sessions And Resume
+
+The task server proxies `/api/sessions`, `/api/events`, `/api/messages`, `/api/transcripts`, and `/api/tools` to the remote session server configured by `REMOTE_SERVER_URL` (default `http://127.0.0.1:9090`). Docker workers receive a container-reachable `CLAUDE_REMOTE_URL` such as `http://host.docker.internal:9090`, so Claude Code hooks can sync transcripts back to the page.
+
+Claude Code sessions are captured through hooks. Codex runs do not use Claude hooks, so the worker converts `codex exec --json` output into the same session/transcript shape after execution. The remote server also exposes:
+
+```text
+GET /api/sessions/{session_id}/conversation?target=callmyagent|codex
+POST /api/tasks/resume-session
+```
+
+The Sessions page uses this to restore an existing Claude or Codex transcript as a new task conversation, so an agent can continue from prior context with the selected engine.
+
 ## Git Credentials
 
 The execution page supports private repositories through `.netrc` credentials:
